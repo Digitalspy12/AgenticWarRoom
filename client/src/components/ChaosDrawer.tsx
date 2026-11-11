@@ -1,12 +1,11 @@
 // ============================================
-// Chaos Drawer — Left Pane
+// Chaos Drawer — Left Pane (Cockpit Controls)
 // ============================================
-// 3 big red buttons to trigger mock outages
-// + list of active/resolved incidents
 
 import { useState } from 'react';
 import { triggerIncident, getIncident } from '../lib/api';
 import type { Incident, ScenarioId } from '../lib/types';
+import { CURRENT_USER_ID, POLL_INTERVAL_MS, POLL_BACKOFF_MS } from '../lib/constants';
 
 interface ChaosDrawerProps {
   onIncidentCreated: (incident: Incident) => void;
@@ -15,10 +14,44 @@ interface ChaosDrawerProps {
   onSelectIncident: (id: string) => void;
 }
 
-const SCENARIOS: { id: ScenarioId; icon: string; label: string; color: string }[] = [
-  { id: 'db_deadlock', icon: '🗄️', label: 'Database Deadlock', color: 'bg-red-600 hover:bg-red-700' },
-  { id: 'pod_crashloop', icon: '🔄', label: 'Pod CrashLoop', color: 'bg-orange-600 hover:bg-orange-700' },
-  { id: 'redis_502', icon: '⚡', label: '502 API Spike', color: 'bg-yellow-600 hover:bg-yellow-700' },
+interface ScenarioCard {
+  id: ScenarioId;
+  icon: string;
+  label: string;
+  subtitle: string;
+  severity: string;
+  borderHover: string;
+  bgGlow: string;
+}
+
+const SCENARIOS: ScenarioCard[] = [
+  {
+    id: 'db_deadlock',
+    icon: '🗄️',
+    label: 'Database Deadlock',
+    subtitle: 'Postgres pool saturation & 40s lock timeout',
+    severity: 'SEV-1',
+    borderHover: 'hover:border-rose-500/60',
+    bgGlow: 'hover:shadow-rose-950/40',
+  },
+  {
+    id: 'pod_crashloop',
+    icon: '🔄',
+    label: 'Pod CrashLoop',
+    subtitle: 'OOMKilled memory leak in billing worker',
+    severity: 'SEV-1',
+    borderHover: 'hover:border-amber-500/60',
+    bgGlow: 'hover:shadow-amber-950/40',
+  },
+  {
+    id: 'redis_502',
+    icon: '⚡',
+    label: '502 API Spike',
+    subtitle: 'Redis cache eviction & gateway dropped frames',
+    severity: 'SEV-2',
+    borderHover: 'hover:border-sky-500/60',
+    bgGlow: 'hover:shadow-sky-950/40',
+  },
 ];
 
 export function ChaosDrawer({
@@ -34,10 +67,9 @@ export function ChaosDrawer({
     try {
       const response = await triggerIncident({
         scenarioId,
-        commanderId: 'lead_dev',
+        commanderId: CURRENT_USER_ID,
       });
 
-      // Create initial incident object from trigger response
       const incident: Incident = {
         id: response.incidentId,
         scenarioId,
@@ -49,12 +81,12 @@ export function ChaosDrawer({
         mttrSeconds: null,
         metrics: response.metrics,
         pipelineResult: null,
-        commanderId: 'lead_dev',
+        commanderId: CURRENT_USER_ID,
         currentMttrSeconds: 0,
       };
       onIncidentCreated(incident);
 
-      // Poll for pipeline results
+      // Start polling for agent pipeline updates
       pollIncident(response.incidentId);
     } catch (err) {
       console.error('Failed to trigger incident:', err);
@@ -69,123 +101,173 @@ export function ChaosDrawer({
         const inc = await getIncident(id);
         onIncidentCreated(inc);
         if (inc.status !== 'RESOLVED') {
-          setTimeout(poll, 1500);
+          setTimeout(poll, POLL_INTERVAL_MS);
         }
       } catch (err) {
         console.error('Poll failed:', err);
-        setTimeout(poll, 3000);
+        setTimeout(poll, POLL_BACKOFF_MS);
       }
     };
-    // Start polling after a short delay to let the pipeline begin
-    setTimeout(poll, 2000);
+    setTimeout(poll, 1500);
   };
 
-  const statusIcon = (status: string) => {
+  const statusBadge = (status: string) => {
     switch (status) {
-      case 'CRITICAL': return '🔴';
-      case 'DIAGNOSING': return '🟡';
-      case 'AWAITING_APPROVAL': return '🟠';
-      case 'MITIGATING': return '🔵';
-      case 'RESOLVED': return '🟢';
-      default: return '⚪';
+      case 'CRITICAL':
+        return <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30">CRITICAL</span>;
+      case 'DIAGNOSING':
+        return <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300 border border-sky-500/30">DIAGNOSING</span>;
+      case 'AWAITING_APPROVAL':
+        return <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">APPROVAL</span>;
+      case 'MITIGATING':
+        return <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30">MITIGATING</span>;
+      case 'RESOLVED':
+        return <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">RESOLVED</span>;
+      default:
+        return <span className="text-[10px] text-slate-400">{status}</span>;
     }
   };
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Chaos Simulator Header */}
-      <div className="p-4 border-b border-[var(--color-border)]">
-        <h2 className="text-sm font-bold text-red-400 uppercase tracking-wider flex items-center gap-2">
-          🔥 Chaos Simulator
-        </h2>
-        <p className="text-xs text-[var(--color-text-secondary)] mt-1">
-          Trigger a mock production outage
-        </p>
+    <div className="flex flex-col h-full bg-[#0a0e1a]/95 text-slate-200 select-none">
+      {/* Header */}
+      <div className="p-4 border-b border-white/[0.08] flex items-center justify-between">
+        <div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-rose-400 text-sm">🔥</span>
+            <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-100">
+              Chaos Simulator
+            </h2>
+          </div>
+          <p className="text-[11px] text-slate-400 mt-0.5">Inject synthetic outage</p>
+        </div>
+        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20 font-semibold">
+          1-CLICK
+        </span>
       </div>
 
-      {/* Chaos Buttons */}
-      <div className="p-3 space-y-2 border-b border-[var(--color-border)]">
-        {SCENARIOS.map((s) => (
-          <button
-            key={s.id}
-            onClick={() => handleTrigger(s.id)}
-            disabled={triggering !== null}
-            className={`w-full px-3 py-2.5 rounded-lg text-white font-medium text-sm
-              ${triggering === s.id ? 'opacity-50 cursor-wait' : s.color}
-              ${triggering !== null && triggering !== s.id ? 'opacity-30 cursor-not-allowed' : ''}
-              transition-all duration-150 flex items-center gap-2`}
-          >
-            <span className="text-lg">{s.icon}</span>
-            <span>{triggering === s.id ? 'Triggering...' : s.label}</span>
-          </button>
-        ))}
+      {/* Scenario Trigger Cards */}
+      <div className="p-3 space-y-2 border-b border-white/[0.08]">
+        {SCENARIOS.map((s) => {
+          const isCurrentTrigger = triggering === s.id;
+          return (
+            <button
+              key={s.id}
+              onClick={() => handleTrigger(s.id)}
+              disabled={triggering !== null}
+              className={`w-full text-left p-2.5 rounded-xl border border-white/[0.07] bg-[#121829]/80 transition-all duration-200 group relative overflow-hidden shadow-sm ${s.borderHover} ${s.bgGlow} ${
+                isCurrentTrigger ? 'ring-2 ring-blue-500 bg-blue-950/40' : ''
+              } ${triggering !== null && !isCurrentTrigger ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:bg-[#162035]'}`}
+            >
+              <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-base">{s.icon}</span>
+                  <span className="text-xs font-bold text-slate-200 group-hover:text-white">
+                    {s.label}
+                  </span>
+                </div>
+                <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-white/[0.06] text-slate-300 font-mono">
+                  {s.severity}
+                </span>
+              </div>
+              <p className="text-[10px] text-slate-400 leading-tight pl-6 line-clamp-1">
+                {isCurrentTrigger ? '⚡ Injecting failure & notifying agents...' : s.subtitle}
+              </p>
+            </button>
+          );
+        })}
       </div>
 
       {/* Active Incidents List */}
       <div className="flex-1 overflow-y-auto">
         <div className="p-3">
-          <h3 className="text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider mb-2">
-            Active Incidents
-          </h3>
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+              Triage Sessions
+            </h3>
+            <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">
+              {incidents.length}
+            </span>
+          </div>
+
           {incidents.length === 0 ? (
-            <p className="text-xs text-[var(--color-text-secondary)] italic">
-              No incidents yet. Click a button above to start.
-            </p>
+            <div className="text-center py-6 px-3 border border-dashed border-white/[0.08] rounded-xl bg-slate-900/30">
+              <span className="text-2xl block mb-1">🛡️</span>
+              <p className="text-xs font-semibold text-slate-300">No Active Incidents</p>
+              <p className="text-[10px] text-slate-500 mt-0.5">Click a scenario button above to trigger an incident war room</p>
+            </div>
           ) : (
-            <div className="space-y-1">
-              {incidents.map((inc) => (
-                <button
-                  key={inc.id}
-                  onClick={() => onSelectIncident(inc.id)}
-                  className={`w-full text-left px-3 py-2 rounded-md text-xs transition-colors
-                    ${activeIncidentId === inc.id
-                      ? 'bg-[var(--color-bg-card)] border border-[var(--color-border)]'
-                      : 'hover:bg-[var(--color-bg-card)]'
+            <div className="space-y-1.5">
+              {incidents.map((inc) => {
+                const isSelected = activeIncidentId === inc.id;
+                return (
+                  <button
+                    key={inc.id}
+                    onClick={() => onSelectIncident(inc.id)}
+                    className={`w-full text-left p-2.5 rounded-xl text-xs transition-all border ${
+                      isSelected
+                        ? 'bg-blue-600/15 border-blue-500/40 shadow-sm shadow-blue-500/10 text-white'
+                        : 'bg-[#101626]/70 border-white/[0.05] hover:bg-[#141c30] text-slate-300'
                     }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <span>{statusIcon(inc.status)}</span>
-                    <span className="font-medium truncate">{inc.title}</span>
-                  </div>
-                  <div className="ml-6 text-[var(--color-text-secondary)] mt-0.5">
-                    {inc.status} • {inc.severity}
-                  </div>
-                </button>
-              ))}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-semibold truncate max-w-[150px]">{inc.title}</span>
+                      {statusBadge(inc.status)}
+                    </div>
+                    <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono">
+                      <span>#{inc.id.split('-').slice(-2).join('-')}</span>
+                      <span>{inc.mttrSeconds ? `MTTR: ${inc.mttrSeconds}s` : 'Active'}</span>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
       </div>
 
-      {/* Online Participants */}
-      <div className="p-3 border-t border-[var(--color-border)]">
-        <h3 className="text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider mb-2">
-          Online Participants
-        </h3>
-        <div className="space-y-1.5 text-xs">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-green-500" />
-            <span>@lead_dev</span>
-            <span className="text-[var(--color-text-secondary)]">(Commander)</span>
+      {/* Online Agent Squad */}
+      <div className="p-3 border-t border-white/[0.08] bg-[#0c101d]">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+            Connected Sentry Team
+          </h3>
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+        </div>
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between text-xs px-2 py-1 rounded-lg bg-slate-900/60 border border-white/[0.04]">
+            <div className="flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+              <span className="font-semibold text-slate-200">@lead_dev</span>
+            </div>
+            <span className="text-[10px] text-emerald-400 font-mono font-semibold">Commander</span>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-blue-500" />
-            <span>🤖 @LogBot</span>
-            <span className="text-[var(--color-text-secondary)]">(AI)</span>
+
+          <div className="flex items-center justify-between text-xs px-2 py-1 rounded-lg bg-slate-900/60 border border-white/[0.04]">
+            <div className="flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />
+              <span className="font-semibold text-sky-200">🤖 @LogBot</span>
+            </div>
+            <span className="text-[10px] text-sky-400 font-mono">Telemetry</span>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-purple-500" />
-            <span>🧠 @DBAgent</span>
-            <span className="text-[var(--color-text-secondary)]">(AI)</span>
+
+          <div className="flex items-center justify-between text-xs px-2 py-1 rounded-lg bg-slate-900/60 border border-white/[0.04]">
+            <div className="flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-purple-400" />
+              <span className="font-semibold text-purple-200">🧠 @DBAgent</span>
+            </div>
+            <span className="text-[10px] text-purple-400 font-mono">Root Cause</span>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-orange-500" />
-            <span>🛠️ @DeployBot</span>
-            <span className="text-[var(--color-text-secondary)]">(AI)</span>
+
+          <div className="flex items-center justify-between text-xs px-2 py-1 rounded-lg bg-slate-900/60 border border-white/[0.04]">
+            <div className="flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-orange-400" />
+              <span className="font-semibold text-orange-200">🛠️ @DeployBot</span>
+            </div>
+            <span className="text-[10px] text-orange-400 font-mono">Orchestrator</span>
           </div>
         </div>
       </div>
     </div>
   );
 }
-

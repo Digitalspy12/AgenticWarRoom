@@ -5,6 +5,7 @@
 import express from 'express';
 import cors from 'cors';
 import incidentRoutes from './routes/incidents.js';
+import authRoutes from './routes/auth.js';
 import { healthCheck } from './services/llmRouter.js';
 
 const app = express();
@@ -21,6 +22,7 @@ app.use((req, _res, next) => {
 
 // Routes
 app.use('/api/incidents', incidentRoutes);
+app.use('/api/auth', authRoutes);
 
 // LLM Health Check
 app.get('/api/health', async (_req, res) => {

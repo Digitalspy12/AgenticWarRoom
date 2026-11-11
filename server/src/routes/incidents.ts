@@ -9,6 +9,7 @@ import { Router, type Request, type Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { getScenario, getAllScenarioIds, type ScenarioId } from '../services/chaosEngine.js';
 import { runTriagePipeline, type PipelineResult } from '../services/agentPipeline.js';
+import { createGroupChannel, sendGroupMessage } from '../services/nexconnService.js';
 
 const router = Router();
 
@@ -102,18 +103,56 @@ router.post('/trigger', async (req: Request, res: Response) => {
 
   // Run agent pipeline asynchronously
   incident.status = 'DIAGNOSING';
-  try {
-    const result = await runTriagePipeline(
-      scenario,
-      (agentName) => console.log(`[Pipeline] ${incidentId}: ${agentName} started`),
-      (response) => console.log(`[Pipeline] ${incidentId}: ${response.agentName} completed (${response.customType})`),
-    );
-    incident.pipelineResult = result;
-    incident.status = 'AWAITING_APPROVAL';
-    console.log(`[Pipeline] ${incidentId}: Pipeline complete. usedFallback=${result.usedFallback}`);
-  } catch (err) {
-    console.error(`[Pipeline] ${incidentId}: Pipeline failed`, err);
-  }
+  (async () => {
+    // 1. Provision Nexconn Group Channel & post system alert
+    try {
+      await createGroupChannel(incidentId, `Incident: ${scenario.title}`, [
+        commanderId || 'lead_dev',
+      ]);
+      await sendGroupMessage({
+        channelId: incidentId,
+        text: `🚨 ALERT: ${scenario.title}\n\nSeverity: ${scenario.severity}`,
+        customType: 'SYSTEM_ALERT',
+        customData: {
+          incidentId,
+          title: scenario.title,
+          severity: scenario.severity,
+          metrics: scenario.metrics,
+        },
+        agentName: '⚡ SYSTEM',
+      });
+    } catch (nErr) {
+      console.warn(`[Nexconn] Initial channel setup warning:`, nErr);
+    }
+
+    // 2. Run sequential AI agent pipeline
+    try {
+      const result = await runTriagePipeline(
+        scenario,
+        (agentName) => console.log(`[Pipeline] ${incidentId}: ${agentName} started`),
+        async (response) => {
+          console.log(`[Pipeline] ${incidentId}: ${response.agentName} completed (${response.customType})`);
+          // Dispatch response to Nexconn group channel
+          try {
+            await sendGroupMessage({
+              channelId: incidentId,
+              text: response.text,
+              customType: response.customType,
+              customData: response.customData,
+              agentName: response.agentName,
+            });
+          } catch (mErr) {
+            console.warn(`[Nexconn] Failed to send agent message:`, mErr);
+          }
+        },
+      );
+      incident.pipelineResult = result;
+      incident.status = 'AWAITING_APPROVAL';
+      console.log(`[Pipeline] ${incidentId}: Pipeline complete. usedFallback=${result.usedFallback}`);
+    } catch (err) {
+      console.error(`[Pipeline] ${incidentId}: Pipeline failed`, err);
+    }
+  })();
 });
 
 /**
@@ -191,6 +230,14 @@ router.post('/:id/execute', (req: Request, res: Response) => {
       incident.pipelineResult.deployBot.customData.approvedBy = userId || 'lead_dev';
       incident.pipelineResult.deployBot.customData.executedAt = new Date().toISOString();
     }
+
+    // Broadcast resolution message to Nexconn channel
+    sendGroupMessage({
+      channelId: incident.id,
+      text: `✅ INCIDENT RESOLVED — Remediation executed by ${userId || 'lead_dev'}. MTTR: ${incident.mttrSeconds}s`,
+      customType: 'SYSTEM_ALERT',
+      agentName: '⚡ SYSTEM',
+    }).catch((err) => console.warn('[Nexconn] Resolution broadcast failed:', err));
 
     console.log(`[Incident] ${incident.id}: RESOLVED in ${incident.mttrSeconds}s`);
   }, 2000);

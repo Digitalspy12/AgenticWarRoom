@@ -4,6 +4,8 @@ import { IncidentBanner } from './components/IncidentBanner';
 import { ChatPane } from './components/ChatPane';
 import { TelemetryPane } from './components/TelemetryPane';
 import { healthCheck } from './lib/api';
+import { nexconn } from './lib/nexconnClient';
+import { CURRENT_USER_ID } from './lib/constants';
 import type { Incident } from './lib/types';
 import './App.css';
 
@@ -13,7 +15,7 @@ function App() {
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'error'>('connecting');
   const [llmLatency, setLlmLatency] = useState<number | null>(null);
 
-  // Health check on mount
+  // Health check & Nexconn connect on mount
   useEffect(() => {
     healthCheck()
       .then((health) => {
@@ -21,6 +23,11 @@ function App() {
         setLlmLatency(health.llm.latencyMs);
       })
       .catch(() => setConnectionStatus('error'));
+
+    // Connect user to Nexconn Chat
+    nexconn.connect(CURRENT_USER_ID).catch((err) => {
+      console.warn('[Nexconn] Connect error on start:', err);
+    });
   }, []);
 
   // Track incident in the list
@@ -51,7 +58,7 @@ function App() {
       {/* ---- 3-Pane Cockpit ---- */}
       <div className="flex flex-1 overflow-hidden">
         {/* Left Pane: Chaos Simulator + Incident List */}
-        <div className="w-72 border-r border-[var(--color-border)] flex flex-col bg-[var(--color-bg-panel)]">
+        <div className="w-80 border-r border-white/[0.08] flex flex-col bg-[#0a0e1a]/95 shrink-0">
           <ChaosDrawer
             onIncidentCreated={handleIncidentCreated}
             incidents={incidents}
@@ -64,7 +71,7 @@ function App() {
         </div>
 
         {/* Center Pane: War Room Chat */}
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col bg-[#080d19] min-w-0 min-h-0">
           <ChatPane
             incident={activeIncident}
             onIncidentUpdated={handleIncidentUpdated}
@@ -72,7 +79,7 @@ function App() {
         </div>
 
         {/* Right Pane: Telemetry & AI Reasoning */}
-        <div className="w-80 border-l border-[var(--color-border)] bg-[var(--color-bg-panel)]">
+        <div className="w-80 border-l border-white/[0.08] bg-[#0a0f1d]/95 shrink-0 hidden lg:block">
           <TelemetryPane incident={activeIncident} />
         </div>
       </div>

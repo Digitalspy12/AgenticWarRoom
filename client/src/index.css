@@ -1,37 +1,98 @@
 @import "tailwindcss";
 
 /* ============================================
-   Agentic WarRoom — Global Styles
+   Agentic WarRoom — Design Tokens & Theme
    ============================================ */
 
 :root {
-  --color-critical: #ef4444;
-  --color-warning: #f59e0b;
-  --color-resolved: #22c55e;
-  --color-diagnosing: #3b82f6;
-  --color-bg-dark: #0f172a;
-  --color-bg-panel: #1e293b;
-  --color-bg-card: #334155;
-  --color-text-primary: #f1f5f9;
+  color-scheme: dark;
+
+  /* Theme Surfaces (Obsidian High-Tech Cockpit) */
+  --color-bg-dark: #070a12;
+  --color-bg-panel: #0d121f;
+  --color-bg-card: #131a29;
+  --color-bg-card-hover: #1a2337;
+  --color-bg-card-elevated: #162033;
+
+  /* Text & Accents */
+  --color-text-primary: #f8fafc;
   --color-text-secondary: #94a3b8;
-  --color-border: #475569;
+  --color-text-muted: #64748b;
+
+  /* Crisp Borders */
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-border-hover: rgba(255, 255, 255, 0.16);
+  --color-border-subtle: rgba(255, 255, 255, 0.04);
+
+  /* Status Tokens */
+  --color-critical: #f43f5e;
+  --color-warning: #f59e0b;
+  --color-resolved: #10b981;
+  --color-diagnosing: #38bdf8;
+  --color-agent-log: #38bdf8;
+  --color-agent-db: #c084fc;
+  --color-agent-deploy: #fb923c;
 }
 
 body {
   margin: 0;
   background-color: var(--color-bg-dark);
   color: var(--color-text-primary);
-  font-family: 'Inter', 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  overflow: hidden;
+  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
 }
 
-/* Custom scrollbar for dark theme */
+/* Monospace fonts for code & metrics */
+code, pre, .font-mono {
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+/* Modern thin scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 5px;
+  height: 5px;
 }
 ::-webkit-scrollbar-track {
-  background: var(--color-bg-panel);
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--color-border);
-  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* Glass & Glow utilities */
+.glass-panel {
+  background: rgba(13, 18, 31, 0.75);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--color-border);
+}
+
+.glass-card {
+  background: rgba(19, 26, 41, 0.8);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--color-border);
+}
+
+.glow-red {
+  box-shadow: 0 0 20px -5px rgba(244, 63, 94, 0.3);
+}
+
+.glow-blue {
+  box-shadow: 0 0 20px -5px rgba(56, 189, 248, 0.25);
+}
+
+.glow-purple {
+  box-shadow: 0 0 20px -5px rgba(192, 132, 252, 0.25);
+}
+
+.glow-orange {
+  box-shadow: 0 0 20px -5px rgba(251, 146, 60, 0.25);
+}
+
+.glow-emerald {
+  box-shadow: 0 0 25px -5px rgba(16, 185, 129, 0.3);
 }
