@@ -7,6 +7,9 @@ import type {
   Incident,
   TriggerPayload,
   TriggerResponse,
+  ThreadMessage,
+  CardAnnotation,
+  AgentResponse,
 } from './types';
 
 const API_BASE = '/api';
@@ -76,5 +79,62 @@ export async function healthCheck(): Promise<{
   llm: { ok: boolean; model: string; latencyMs: number };
 }> {
   return fetchJSON('/health');
+}
+
+/** Prompt an agent interactively via in-channel command or mention */
+export async function promptAgent(
+  incidentId: string,
+  payload: { text: string; sender?: string; threadId?: string; targetAgent?: string },
+): Promise<{ success: boolean; agentName: string; response: AgentResponse }> {
+  return fetchJSON(`/incidents/${incidentId}/prompt`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+/** Get all thread message counts and threads for an incident */
+export async function getCardThreads(
+  incidentId: string,
+): Promise<{ counts: Record<string, number>; threads: Record<string, ThreadMessage[]> }> {
+  return fetchJSON(`/incidents/${incidentId}/threads`);
+}
+
+/** Get messages in a specific card thread */
+export async function getCardThread(
+  incidentId: string,
+  cardId: string,
+): Promise<{ cardId: string; messages: ThreadMessage[] }> {
+  return fetchJSON(`/incidents/${incidentId}/threads/${encodeURIComponent(cardId)}`);
+}
+
+/** Post a reply message in a card thread */
+export async function postCardThreadMessage(
+  incidentId: string,
+  cardId: string,
+  payload: { text: string; sender?: string; triggerAgent?: boolean },
+): Promise<{ message: ThreadMessage; threadCount: number; messages: ThreadMessage[] }> {
+  return fetchJSON(`/incidents/${incidentId}/threads/${encodeURIComponent(cardId)}`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+/** Get all card annotations for an incident */
+export async function getCardAnnotations(
+  incidentId: string,
+): Promise<{ annotations: Record<string, CardAnnotation> }> {
+  return fetchJSON(`/incidents/${incidentId}/annotations`);
+}
+
+/** Set or update a pinned annotation on a card */
+export async function saveCardAnnotation(
+  incidentId: string,
+  cardId: string,
+  payload: { note: string; author?: string },
+): Promise<{ annotation: CardAnnotation }> {
+  return fetchJSON(`/incidents/${incidentId}/annotations/${encodeURIComponent(cardId)}`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
 }
 

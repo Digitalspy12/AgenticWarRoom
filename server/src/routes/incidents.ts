@@ -10,8 +10,26 @@ import { v4 as uuidv4 } from 'uuid';
 import { getScenario, getAllScenarioIds, type ScenarioId } from '../services/chaosEngine.js';
 import { runTriagePipeline, type PipelineResult } from '../services/agentPipeline.js';
 import { createGroupChannel, sendGroupMessage } from '../services/nexconnService.js';
+import { promptInteractiveAgent, type IncidentContext } from '../services/llmRouter.js';
 
 const router = Router();
+
+export interface ThreadMessage {
+  id: string;
+  cardId: string;
+  sender: string;
+  text: string;
+  timestamp: number;
+  isAgent: boolean;
+  agentName?: string;
+}
+
+export interface CardAnnotation {
+  cardId: string;
+  note: string;
+  author: string;
+  timestamp: number;
+}
 
 // In-memory incident store (sufficient for hackathon demo)
 interface Incident {
@@ -31,9 +49,125 @@ interface Incident {
   };
   pipelineResult: PipelineResult | null;
   commanderId: string | null;
+  threads: Record<string, ThreadMessage[]>;
+  annotations: Record<string, CardAnnotation>;
 }
 
 const incidents = new Map<string, Incident>();
+
+function param(val: string | string[]): string {
+  return Array.isArray(val) ? val[0] : val;
+}
+
+function requireIncident(req: Request, res: Response): Incident | null {
+  const incident = incidents.get(param(req.params.id));
+  if (!incident) {
+    res.status(404).json({ error: 'Incident not found' });
+    return null;
+  }
+  return incident;
+}
+
+async function sendTyping(
+  channelId: string,
+  agentName: string,
+  status: 'typing' | 'done',
+  statusText?: string,
+  threadId?: string,
+) {
+  try {
+    await sendGroupMessage({
+      channelId,
+      text: status === 'typing' ? statusText || `${agentName} is analyzing...` : '',
+      customType: 'TYPING_INDICATOR',
+      customData: { agentName, status, statusText, threadId },
+      agentName,
+    });
+  } catch (err) {
+    console.warn(`[Nexconn] Typing indicator (${status}) warning for ${agentName}:`, err);
+  }
+}
+
+async function runAgentReply(
+  incident: Incident,
+  targetAgent: string,
+  text: string,
+  threadId?: string,
+) {
+  await sendTyping(
+    incident.id,
+    targetAgent,
+    'typing',
+    threadId ? `${targetAgent} is formulating thread reply...` : `${targetAgent} is analyzing your instruction...`,
+    threadId,
+  );
+
+  const context: IncidentContext = {
+    id: incident.id,
+    scenarioId: incident.scenarioId,
+    title: incident.title,
+    severity: incident.severity,
+    stackTrace: getScenario(incident.scenarioId).stackTrace,
+    metrics: incident.metrics,
+    pipelineResult: incident.pipelineResult,
+  };
+
+  try {
+    const agentResponse = await promptInteractiveAgent(targetAgent, text, context);
+
+    // Sync revised Action Card to incident state so Approve executes the updated plan
+    if (agentResponse.customType === 'ACTION_CARD' && targetAgent === '@DeployBot') {
+      if (!incident.pipelineResult) {
+        incident.pipelineResult = {
+          logBot: { agentName: '@LogBot', customType: 'DIAGNOSTIC_LOG', text: '', customData: {} },
+          dbAgent: { agentName: '@DBAgent', customType: 'ROOT_CAUSE_ANALYSIS', text: '', customData: {} },
+          deployBot: agentResponse,
+          usedFallback: false,
+        };
+      } else {
+        incident.pipelineResult.deployBot = agentResponse;
+      }
+      incident.status = 'AWAITING_APPROVAL';
+    }
+
+    if (threadId) {
+      if (!incident.threads[threadId]) incident.threads[threadId] = [];
+      incident.threads[threadId].push({
+        id: `th-${Date.now()}-${uuidv4().slice(0, 4)}`,
+        cardId: threadId,
+        sender: targetAgent,
+        text: agentResponse.text,
+        timestamp: Date.now(),
+        isAgent: true,
+        agentName: targetAgent,
+      });
+    }
+
+    const broadcastType =
+      threadId && agentResponse.customType !== 'ACTION_CARD' ? 'THREAD_REPLY' : agentResponse.customType;
+
+    try {
+      await sendGroupMessage({
+        channelId: incident.id,
+        text: agentResponse.text,
+        customType: broadcastType,
+        customData: {
+          ...agentResponse.customData,
+          ...(threadId
+            ? { threadId, agentName: targetAgent, isThreadReply: true, threadCount: incident.threads[threadId].length }
+            : {}),
+        },
+        agentName: targetAgent,
+      });
+    } catch (err) {
+      console.warn(`[Nexconn] Failed to broadcast agent reply:`, err);
+    }
+
+    return agentResponse;
+  } finally {
+    await sendTyping(incident.id, targetAgent, 'done', undefined, threadId);
+  }
+}
 
 /**
  * GET /api/incidents/scenarios
@@ -84,6 +218,8 @@ router.post('/trigger', async (req: Request, res: Response) => {
     metrics: { ...scenario.metrics },
     pipelineResult: null,
     commanderId: commanderId || null,
+    threads: {},
+    annotations: {},
   };
 
   incidents.set(incidentId, incident);
@@ -125,14 +261,17 @@ router.post('/trigger', async (req: Request, res: Response) => {
       console.warn(`[Nexconn] Initial channel setup warning:`, nErr);
     }
 
-    // 2. Run sequential AI agent pipeline
+    // 2. Run sequential AI agent pipeline with typing indicators
     try {
       const result = await runTriagePipeline(
         scenario,
-        (agentName) => console.log(`[Pipeline] ${incidentId}: ${agentName} started`),
+        async (agentName, statusText) => {
+          console.log(`[Pipeline] ${incidentId}: ${agentName} started (${statusText})`);
+          await sendTyping(incidentId, agentName, 'typing', statusText);
+        },
         async (response) => {
           console.log(`[Pipeline] ${incidentId}: ${response.agentName} completed (${response.customType})`);
-          // Dispatch response to Nexconn group channel
+          await sendTyping(incidentId, response.agentName, 'done');
           try {
             await sendGroupMessage({
               channelId: incidentId,
@@ -270,6 +409,209 @@ router.post('/:id/reject', (req: Request, res: Response) => {
     status: 'DIAGNOSING',
     message: 'Fix rejected. Agents will re-analyze.',
   });
+});
+
+/**
+ * Helper to identify which agent is targeted in a message.
+ */
+function resolveTargetAgent(text: string, cardIdHint?: string): string {
+  if (/@DeployBot/i.test(text)) return '@DeployBot';
+  if (/@LogBot/i.test(text)) return '@LogBot';
+  if (/@DBAgent/i.test(text)) return '@DBAgent';
+
+  if (cardIdHint) {
+    if (cardIdHint.includes('log')) return '@LogBot';
+    if (cardIdHint.includes('db') || cardIdHint.includes('cause')) return '@DBAgent';
+    if (cardIdHint.includes('action') || cardIdHint.includes('deploy')) return '@DeployBot';
+  }
+
+  const lower = text.toLowerCase();
+  if (/(rollback|scale|deploy|risk|command|fix|playbook|script|apply|action)/.test(lower)) {
+    return '@DeployBot';
+  }
+  if (/(database|deadlock|pool|cascade|why|metrics|latency|cpu|connection|query)/.test(lower)) {
+    return '@DBAgent';
+  }
+  if (/(log|trace|error|stack|file|line|exception|frame)/.test(lower)) {
+    return '@LogBot';
+  }
+
+  return '@DeployBot';
+}
+
+/**
+ * POST /api/incidents/:id/prompt
+ * Prompt a specific agent interactively from chat or quick mention
+ */
+router.post('/:id/prompt', async (req: Request, res: Response) => {
+  const incident = requireIncident(req, res);
+  if (!incident) return;
+
+  const { text, threadId, targetAgent: requestedAgent } = req.body as {
+    text: string;
+    sender?: string;
+    threadId?: string;
+    targetAgent?: string;
+  };
+
+  if (!text?.trim()) {
+    res.status(400).json({ error: 'Prompt text is required' });
+    return;
+  }
+
+  const targetAgent = requestedAgent || resolveTargetAgent(text, threadId);
+
+  try {
+    const response = await runAgentReply(incident, targetAgent, text, threadId);
+    res.json({ success: true, agentName: targetAgent, response });
+  } catch (err) {
+    console.error(`[Prompt] Failed for ${targetAgent}:`, err);
+    res.status(500).json({ error: 'Failed to process prompt' });
+  }
+});
+
+/**
+ * GET /api/incidents/:id/threads
+ * Get reply counts for all cards in this incident
+ */
+router.get('/:id/threads', (req: Request, res: Response) => {
+  const incident = requireIncident(req, res);
+  if (!incident) return;
+
+  const counts: Record<string, number> = {};
+  for (const [cardId, list] of Object.entries(incident.threads)) {
+    counts[cardId] = list.length;
+  }
+  res.json({ counts, threads: incident.threads });
+});
+
+/**
+ * GET /api/incidents/:id/threads/:cardId
+ * Get thread history for a specific card
+ */
+router.get('/:id/threads/:cardId', (req: Request, res: Response) => {
+  const incident = requireIncident(req, res);
+  if (!incident) return;
+
+  const cardId = param(req.params.cardId);
+  res.json({ cardId, messages: incident.threads[cardId] || [] });
+});
+
+/**
+ * POST /api/incidents/:id/threads/:cardId
+ * Post a reply in a card's thread (and optionally trigger agent reasoning)
+ */
+router.post('/:id/threads/:cardId', async (req: Request, res: Response) => {
+  const incident = requireIncident(req, res);
+  if (!incident) return;
+
+  const cardId = param(req.params.cardId);
+  const { text, sender, triggerAgent } = req.body as {
+    text: string;
+    sender?: string;
+    triggerAgent?: boolean;
+  };
+
+  if (!text?.trim()) {
+    res.status(400).json({ error: 'Message text is required' });
+    return;
+  }
+
+  if (!incident.threads[cardId]) {
+    incident.threads[cardId] = [];
+  }
+
+  const userMsg: ThreadMessage = {
+    id: `th-${Date.now()}-${uuidv4().slice(0, 4)}`,
+    cardId,
+    sender: sender || 'lead_dev',
+    text: text.trim(),
+    timestamp: Date.now(),
+    isAgent: false,
+  };
+  incident.threads[cardId].push(userMsg);
+
+  try {
+    await sendGroupMessage({
+      channelId: incident.id,
+      text: `${userMsg.sender}: ${userMsg.text}`,
+      customType: 'THREAD_REPLY',
+      customData: {
+        threadId: cardId,
+        sender: userMsg.sender,
+        isThreadReply: true,
+        threadCount: incident.threads[cardId].length,
+      },
+      agentName: userMsg.sender,
+    });
+  } catch (err) {
+    console.warn('[Nexconn] Failed to broadcast thread reply:', err);
+  }
+
+  if (/@(DeployBot|LogBot|DBAgent)/i.test(text) || triggerAgent) {
+    const targetAgent = resolveTargetAgent(text, cardId);
+    try {
+      await runAgentReply(incident, targetAgent, text, cardId);
+    } catch (err) {
+      console.warn(`[Thread Agent] Failed to reply:`, err);
+    }
+  }
+
+  res.status(201).json({
+    message: userMsg,
+    threadCount: incident.threads[cardId].length,
+    messages: incident.threads[cardId],
+  });
+});
+
+/**
+ * GET /api/incidents/:id/annotations
+ * Get all card annotations for an incident
+ */
+router.get('/:id/annotations', (req: Request, res: Response) => {
+  const incident = requireIncident(req, res);
+  if (!incident) return;
+  res.json({ annotations: incident.annotations || {} });
+});
+
+/**
+ * POST /api/incidents/:id/annotations/:cardId
+ * Set or update a pinned annotation on a card
+ */
+router.post('/:id/annotations/:cardId', async (req: Request, res: Response) => {
+  const incident = requireIncident(req, res);
+  if (!incident) return;
+
+  const cardId = param(req.params.cardId);
+  const { note, author } = req.body as { note: string; author?: string };
+  if (!note?.trim()) {
+    res.status(400).json({ error: 'Annotation note is required' });
+    return;
+  }
+
+  const annotation: CardAnnotation = {
+    cardId,
+    note: note.trim(),
+    author: author || 'lead_dev',
+    timestamp: Date.now(),
+  };
+
+  if (!incident.annotations) incident.annotations = {};
+  incident.annotations[cardId] = annotation;
+
+  try {
+    await sendGroupMessage({
+      channelId: incident.id,
+      text: `📌 [Annotation] ${annotation.author} pinned a note on ${cardId}: "${annotation.note}"`,
+      customType: 'CARD_ANNOTATION',
+      customData: { ...annotation },
+      agentName: '⚡ SYSTEM',
+    });
+  } catch (err) {
+    console.warn('[Nexconn] Failed to broadcast annotation:', err);
+  }
+
+  res.json({ annotation });
 });
 
 export default router;

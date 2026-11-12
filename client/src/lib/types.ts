@@ -16,7 +16,36 @@ export type CustomMessageType =
   | 'ROOT_CAUSE_ANALYSIS'
   | 'ACTION_CARD'
   | 'RCA_SUMMARY'
-  | 'SYSTEM_ALERT';
+  | 'SYSTEM_ALERT'
+  | 'TYPING_INDICATOR'
+  | 'AGENT_CHAT'
+  | 'THREAD_REPLY'
+  | 'CARD_ANNOTATION';
+
+export interface ThreadMessage {
+  id: string;
+  cardId: string;
+  sender: string;
+  text: string;
+  timestamp: number;
+  isAgent: boolean;
+  agentName?: string;
+}
+
+export interface CardAnnotation {
+  cardId: string;
+  note: string;
+  author: string;
+  timestamp: number;
+}
+
+export interface TypingStatus {
+  agentName: string;
+  status: 'typing' | 'done';
+  statusText?: string;
+  timestamp?: number;
+  threadId?: string;
+}
 
 export interface Scenario {
   id: ScenarioId;

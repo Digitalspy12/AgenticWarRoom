@@ -2,12 +2,26 @@
 // Root Cause Analysis Card — @DBAgent Message Card
 // ============================================
 
+import { CardFooter } from './CardFooter';
+import type { CardAnnotation } from '../../lib/types';
+
 interface RootCauseCardProps {
   data: Record<string, unknown>;
   text: string;
+  cardId?: string;
+  threadCount?: number;
+  annotation?: CardAnnotation;
+  onOpenThread?: (cardId: string, title: string, subtitle: string, agentName: string) => void;
 }
 
-export function RootCauseCard({ data, text }: RootCauseCardProps) {
+export function RootCauseCard({
+  data,
+  text,
+  cardId = 'card-dbagent',
+  threadCount = 0,
+  annotation,
+  onOpenThread,
+}: RootCauseCardProps) {
   const rootCause = (data.rootCause as string) || text;
   const affectedComponent = (data.affectedComponent as string) || 'Infrastructure';
   const failureChain = (data.failureChain as string[]) || [];
@@ -93,6 +107,17 @@ export function RootCauseCard({ data, text }: RootCauseCardProps) {
           </div>
         )}
       </div>
+
+      <CardFooter
+        cardId={cardId}
+        title={`RCA: ${affectedComponent}`}
+        subtitle={rootCause}
+        agentName="@DBAgent"
+        buttonClass="bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border-purple-500/20"
+        threadCount={threadCount}
+        annotation={annotation}
+        onOpenThread={onOpenThread}
+      />
     </div>
   );
 }

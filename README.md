@@ -90,11 +90,12 @@ nexconn_chatapp_Hackathon/
 - **Bidirectional Human Chat**: Engineers can send text messages directly into the war room channel via the interactive input bar.
 - **Obsidian SRE Cockpit Redesign**: Complete visual overhaul with glass panels, high-contrast badges, and user-aware auto-scroll that preserves scroll position when reading earlier messages.
 
-### 🔜 Phase 3 (Day 3) — Agent Interactivity & Typing Indicators
-*Target: Nov 11, 2026*
-- **Typing Indicators**: Show live `🤖 @LogBot is analyzing stack traces...` status in chat while agents reason.
-- **Agent Prompting via Chat**: Engineers can query specific agents in-channel (e.g., `@DeployBot change risk to LOW` or `@LogBot show last 20 lines`).
-- **Threaded Replies & Annotations**: Support thread responses for specific diagnostic cards.
+### ✅ Phase 3 (Day 3) — Agent Interactivity & Typing Indicators
+*Status: COMPLETED*
+- **Live Typing Indicators**: Real-time agent typing state broadcast via Nexconn WebSocket (`customType: 'TYPING_INDICATOR'`) rendered with animated bouncing wave dots and agent-specific status phrases (`🤖 @LogBot is analyzing stack traces...`, `🧠 @DBAgent is correlating telemetry...`, `🛠️ @DeployBot is synthesizing remediation playbook...`).
+- **In-Channel Agent Prompting**: On-call engineers can directly query or instruct agents in-channel (e.g., `@DeployBot change risk to LOW`, `@LogBot show last 20 lines`, `@DBAgent explain deadlock`) using the interactive input bar or 1-click Quick Mention action chips.
+- **Dynamic Playbook Adaptation**: When instructed to alter risk or commands, `@DeployBot` regenerates a revised `ACTION_CARD` in real time and updates the incident state machine so the new playbook can be immediately approved and executed.
+- **Threaded Discussions & Card Annotations**: Every diagnostic card (`DiagnosticLogCard`, `RootCauseCard`, `ActionCard`) features a slide-over discussion drawer (`CardThreadDrawer.tsx`) supporting threaded Q&A, tailored quick prompt chips, and pinned SRE annotations displayed directly on cards in the main feed.
 
 ### 🔜 Phase 4 (Day 4) — Nexconn Channel Metadata & Cross-Tab Sync
 *Target: Nov 12, 2026*

@@ -3,13 +3,26 @@
 // ============================================
 
 import { useState } from 'react';
+import { CardFooter } from './CardFooter';
+import type { CardAnnotation } from '../../lib/types';
 
 interface DiagnosticLogCardProps {
   data: Record<string, unknown>;
   text: string;
+  cardId?: string;
+  threadCount?: number;
+  annotation?: CardAnnotation;
+  onOpenThread?: (cardId: string, title: string, subtitle: string, agentName: string) => void;
 }
 
-export function DiagnosticLogCard({ data, text }: DiagnosticLogCardProps) {
+export function DiagnosticLogCard({
+  data,
+  text,
+  cardId = 'card-logbot',
+  threadCount = 0,
+  annotation,
+  onOpenThread,
+}: DiagnosticLogCardProps) {
   const service = (data.service as string) || 'service-core';
   const filePath = (data.filePath as string) || '';
   const lineNumber = data.lineNumber as number | undefined;
@@ -120,6 +133,17 @@ export function DiagnosticLogCard({ data, text }: DiagnosticLogCardProps) {
           ))}
         </div>
       )}
+
+      <CardFooter
+        cardId={cardId}
+        title={`Log Analysis: ${service}`}
+        subtitle={filePath ? `${filePath}:${lineNumber || 0}` : errorSignature}
+        agentName="@LogBot"
+        buttonClass="bg-sky-500/10 hover:bg-sky-500/20 text-sky-300 border-sky-500/20"
+        threadCount={threadCount}
+        annotation={annotation}
+        onOpenThread={onOpenThread}
+      />
     </div>
   );
 }

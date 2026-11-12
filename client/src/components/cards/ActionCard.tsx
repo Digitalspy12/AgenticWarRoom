@@ -3,6 +3,8 @@
 // ============================================
 
 import { useState } from 'react';
+import { CardFooter } from './CardFooter';
+import type { CardAnnotation } from '../../lib/types';
 
 interface ActionCardProps {
   data: Record<string, unknown>;
@@ -11,6 +13,10 @@ interface ActionCardProps {
   onReject: () => void;
   executing: boolean;
   incidentStatus: string;
+  cardId?: string;
+  threadCount?: number;
+  annotation?: CardAnnotation;
+  onOpenThread?: (cardId: string, title: string, subtitle: string, agentName: string) => void;
 }
 
 export function ActionCard({
@@ -20,6 +26,10 @@ export function ActionCard({
   onReject,
   executing,
   incidentStatus,
+  cardId = 'card-deploybot',
+  threadCount = 0,
+  annotation,
+  onOpenThread,
 }: ActionCardProps) {
   const actionType = (data.actionType as string) || 'SYSTEM_REMEDIATION';
   const riskLevel = (data.riskLevel as string) || 'MEDIUM';
@@ -163,6 +173,17 @@ export function ActionCard({
           </>
         )}
       </div>
+
+      <CardFooter
+        cardId={cardId}
+        title={`Remediation Playbook: ${actionType.replace(/_/g, ' ')}`}
+        subtitle={commandPreview || text}
+        agentName="@DeployBot"
+        buttonClass="bg-orange-500/10 hover:bg-orange-500/20 text-orange-300 border-orange-500/20"
+        threadCount={threadCount}
+        annotation={annotation}
+        onOpenThread={onOpenThread}
+      />
     </div>
   );
 }

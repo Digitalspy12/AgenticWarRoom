@@ -58,13 +58,13 @@ async function callWithFallback(
  */
 export async function runTriagePipeline(
   scenario: ChaosScenario,
-  onAgentStart?: (agentName: string) => void,
-  onAgentComplete?: (response: AgentResponse) => void,
+  onAgentStart?: (agentName: string, statusText: string) => Promise<void> | void,
+  onAgentComplete?: (response: AgentResponse) => Promise<void> | void,
 ): Promise<PipelineResult> {
   let usedFallback = false;
 
   // ---- Stage 1: @LogBot ----
-  onAgentStart?.('@LogBot');
+  await onAgentStart?.('@LogBot', 'Analyzing stack traces & anomalous log frames...');
   const logBotInput = `INCIDENT: ${scenario.title}\n\nStack Trace & Error Logs:\n${scenario.stackTrace}\n\nSystem Metrics:\n- CPU: ${scenario.metrics.cpuPercent}%\n- Error Rate: ${scenario.metrics.errorRatePercent}%\n- Healthy Pods: ${scenario.metrics.healthyPods}\n- Avg Latency: ${scenario.metrics.requestLatencyMs}ms`;
 
   const logBotResult = await callWithFallback(
@@ -75,10 +75,10 @@ export async function runTriagePipeline(
     'logBot',
   );
   if (logBotResult.wasFallback) usedFallback = true;
-  onAgentComplete?.(logBotResult.response);
+  await onAgentComplete?.(logBotResult.response);
 
   // ---- Stage 2: @DBAgent ----
-  onAgentStart?.('@DBAgent');
+  await onAgentStart?.('@DBAgent', 'Correlating telemetry & isolating root cause...');
   const dbAgentInput = `INCIDENT: ${scenario.title}\n\n@LogBot Diagnostic Report:\n${JSON.stringify(logBotResult.response.customData, null, 2)}\n\nSystem Metrics:\n- CPU: ${scenario.metrics.cpuPercent}%\n- Error Rate: ${scenario.metrics.errorRatePercent}%\n- Healthy Pods: ${scenario.metrics.healthyPods}\n- Avg Latency: ${scenario.metrics.requestLatencyMs}ms`;
 
   const dbAgentResult = await callWithFallback(
@@ -89,10 +89,10 @@ export async function runTriagePipeline(
     'dbAgent',
   );
   if (dbAgentResult.wasFallback) usedFallback = true;
-  onAgentComplete?.(dbAgentResult.response);
+  await onAgentComplete?.(dbAgentResult.response);
 
   // ---- Stage 3: @DeployBot ----
-  onAgentStart?.('@DeployBot');
+  await onAgentStart?.('@DeployBot', 'Synthesizing HITL remediation playbook & commands...');
   const deployBotInput = `INCIDENT: ${scenario.title}\n\n@LogBot Diagnostic:\n${JSON.stringify(logBotResult.response.customData, null, 2)}\n\n@DBAgent Root Cause Analysis:\n${JSON.stringify(dbAgentResult.response.customData, null, 2)}\n\nPropose a concrete remediation plan with executable commands.`;
 
   const deployBotResult = await callWithFallback(
@@ -103,7 +103,7 @@ export async function runTriagePipeline(
     'deployBot',
   );
   if (deployBotResult.wasFallback) usedFallback = true;
-  onAgentComplete?.(deployBotResult.response);
+  await onAgentComplete?.(deployBotResult.response);
 
   return {
     logBot: logBotResult.response,

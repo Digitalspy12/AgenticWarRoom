@@ -73,6 +73,7 @@ function App() {
         {/* Center Pane: War Room Chat */}
         <div className="flex-1 flex flex-col bg-[#080d19] min-w-0 min-h-0">
           <ChatPane
+            key={activeIncident?.id ?? 'empty'}
             incident={activeIncident}
             onIncidentUpdated={handleIncidentUpdated}
           />
