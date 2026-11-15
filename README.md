@@ -97,10 +97,14 @@ nexconn_chatapp_Hackathon/
 - **Dynamic Playbook Adaptation**: When instructed to alter risk or commands, `@DeployBot` regenerates a revised `ACTION_CARD` in real time and updates the incident state machine so the new playbook can be immediately approved and executed.
 - **Threaded Discussions & Card Annotations**: Every diagnostic card (`DiagnosticLogCard`, `RootCauseCard`, `ActionCard`) features a slide-over discussion drawer (`CardThreadDrawer.tsx`) supporting threaded Q&A, tailored quick prompt chips, and pinned SRE annotations displayed directly on cards in the main feed.
 
-### 🔜 Phase 4 (Day 4) — Nexconn Channel Metadata & Cross-Tab Sync
-*Target: Nov 12, 2026*
-- **Nexconn Room KV Store**: Sync incident status, active severity, and started timestamp in channel key-value metadata.
-- **Cross-Tab Synchronization**: Zero-polling live sync — opening the WarRoom in multiple tabs reflects status updates and actions instantaneously.
+### ✅ Phase 4 (Day 4) — Multiplayer War Room & Cross-Tab Sync
+*Status: COMPLETED*
+- **"Dev A Invites Dev B" Paging Flow**: Header button **`[📟 + Page SRE]`** in `IncidentBanner.tsx` allows the Incident Commander (`@lead_dev`) to invite on-call responders (`@sre_oncall`) directly into the active group channel via `POST /api/incidents/:id/invite` with automatic clipboard link copying and 1-click **[Open Tab ↗]** toast navigation.
+- **Dynamic Group Membership**: Uses Nexconn Platform API (`POST /v4/group-channel/join` and initial pre-seeding) to authorize responders dynamically without approval walls.
+- **High-Priority WebSocket Sync (`customType: 'INCIDENT_SYNC'`)**: Broadcasts real-time state changes (`CRITICAL` → `DIAGNOSING` → `AWAITING_APPROVAL` → `MITIGATING` → `RESOLVED`) instantly across all open tabs with zero polling.
+- **Split-Brain Double-Approval Defense**: Remediation approvals immediately broadcast `MITIGATING` state, locking the Action Card on all responder screens simultaneously. Subsequent approval calls are blocked with **HTTP 409 Conflict**.
+- **Zero-Drift MTTR Stopwatch**: Digital MTTR timer synchronized on immutable `startedAt` Unix timestamps computed locally by each browser tab.
+- **Multi-Device Session Protection**: Distinct per-tab identities (`lead_dev` vs `sre_oncall` via `?as=<id>` query params and `sessionStorage`) with real-time `onConnectionStatus` listener alerting on socket kicks.
 
 ### 🔜 Phase 5 (Day 5) — Voice Dispatch & Incident Briefings
 *Target: Nov 13, 2026*

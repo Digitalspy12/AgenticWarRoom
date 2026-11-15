@@ -28,13 +28,36 @@ export interface ParsedChatMessage {
   isSystem: boolean;
 }
 
+export type NexconnConnectionState = 'connected' | 'connecting' | 'disconnected' | 'kicked';
+type ConnectionStateListener = (
+  state: NexconnConnectionState,
+  detail?: { status: number; code?: number },
+) => void;
+
 type MessageListener = (message: ParsedChatMessage) => void;
 
 class NexconnManager {
   private initialized = false;
   private connected = false;
   private currentUserId = '';
+  private currentConnectionState: NexconnConnectionState = 'connecting';
+  private connectionListeners: Set<ConnectionStateListener> = new Set();
   private listeners: Map<string, Set<MessageListener>> = new Map();
+
+  /**
+   * Subscribe to connection status lifecycle events (connected, disconnected, kicked).
+   */
+  onConnectionStatus(listener: ConnectionStateListener): () => void {
+    this.connectionListeners.add(listener);
+    listener(this.currentConnectionState);
+    return () => {
+      this.connectionListeners.delete(listener);
+    };
+  }
+
+  getConnectionState(): NexconnConnectionState {
+    return this.currentConnectionState;
+  }
 
   /**
    * Initialize and connect to Nexconn Chat SDK.
@@ -78,7 +101,26 @@ class NexconnManager {
           'warroom-status',
           new ConnectionStatusHandler({
             onConnectionStatusChanged: (event) => {
-              console.log('[Nexconn] Connection status changed:', event.status);
+              const code = event.code;
+              const isKicked = code === 6 || code === 31004;
+              const nextState: NexconnConnectionState = isKicked
+                ? 'kicked'
+                : event.status === 0
+                  ? 'connected'
+                  : event.status === 1
+                    ? 'connecting'
+                    : 'disconnected';
+
+              console.log('[Nexconn] Connection status changed:', event.status, 'code:', code, '->', nextState);
+              this.currentConnectionState = nextState;
+              this.connected = nextState === 'connected';
+              this.connectionListeners.forEach((fn) => {
+                try {
+                  fn(nextState, event);
+                } catch (err) {
+                  console.error('[Nexconn] Connection listener error:', err);
+                }
+              });
             },
           }),
         );

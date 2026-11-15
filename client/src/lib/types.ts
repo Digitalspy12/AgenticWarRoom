@@ -20,7 +20,8 @@ export type CustomMessageType =
   | 'TYPING_INDICATOR'
   | 'AGENT_CHAT'
   | 'THREAD_REPLY'
-  | 'CARD_ANNOTATION';
+  | 'CARD_ANNOTATION'
+  | 'INCIDENT_SYNC';
 
 export interface ThreadMessage {
   id: string;

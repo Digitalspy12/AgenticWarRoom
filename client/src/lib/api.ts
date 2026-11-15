@@ -138,3 +138,20 @@ export async function saveCardAnnotation(
   });
 }
 
+/** Invite an on-call responder to the active war room */
+export async function inviteResponder(
+  incidentId: string,
+  payload?: { targetUserId?: string; invitedBy?: string },
+): Promise<{
+  success: boolean;
+  incidentId: string;
+  targetUserId: string;
+  invitedBy: string;
+  inviteLink: string;
+}> {
+  return fetchJSON(`/incidents/${incidentId}/invite`, {
+    method: 'POST',
+    body: JSON.stringify(payload || {}),
+  });
+}
+

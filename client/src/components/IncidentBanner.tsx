@@ -3,11 +3,15 @@
 // ============================================
 
 import { useState, useEffect } from 'react';
+import { CURRENT_USER_ID, WARROOM_USERS, setSessionUserId } from '../lib/constants';
+import { inviteResponder } from '../lib/api';
 import type { Incident } from '../lib/types';
+import type { NexconnConnectionState } from '../lib/nexconnClient';
 
 interface IncidentBannerProps {
   incident: Incident | null;
   connectionStatus: 'connecting' | 'connected' | 'error';
+  nexconnStatus?: NexconnConnectionState;
   llmLatency: number | null;
 }
 
@@ -17,18 +21,79 @@ function formatTime(seconds: number): string {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
-export function IncidentBanner({ incident, connectionStatus, llmLatency }: IncidentBannerProps) {
-  const [elapsed, setElapsed] = useState(0);
+export function IncidentBanner({
+  incident,
+  connectionStatus,
+  nexconnStatus = 'connected',
+  llmLatency,
+}: IncidentBannerProps) {
+  const [liveElapsed, setLiveElapsed] = useState(() =>
+    incident && !incident.resolvedAt
+      ? Math.floor((Date.now() - incident.startedAt) / 1000)
+      : 0,
+  );
+  const [paging, setPaging] = useState(false);
+  const [inviteToast, setInviteToast] = useState<{
+    link: string;
+    target: string;
+    copied: boolean;
+  } | null>(null);
+
+  const elapsed = incident?.resolvedAt
+    ? (incident.mttrSeconds ?? Math.floor((incident.resolvedAt - incident.startedAt) / 1000))
+    : liveElapsed;
+
+  const currentUser = WARROOM_USERS.find((u) => u.id === CURRENT_USER_ID) || {
+    id: CURRENT_USER_ID,
+    name: CURRENT_USER_ID,
+    role: 'Engineer',
+    initials: CURRENT_USER_ID.slice(0, 2).toUpperCase(),
+    gradient: 'from-indigo-500 to-purple-500',
+  };
+
+  const handlePageResponder = async () => {
+    if (!incident || paging) return;
+    setPaging(true);
+    const targetUserId = CURRENT_USER_ID === 'lead_dev' ? 'sre_oncall' : 'lead_dev';
+
+    try {
+      const res = await inviteResponder(incident.id, {
+        targetUserId,
+        invitedBy: CURRENT_USER_ID,
+      });
+
+      const link =
+        res.inviteLink ||
+        `${window.location.origin}/?inc=${incident.id}&as=${targetUserId}`;
+
+      try {
+        await navigator.clipboard.writeText(link);
+      } catch {
+        // clipboard might be restricted in some browsers
+      }
+
+      setInviteToast({
+        link,
+        target: targetUserId,
+        copied: true,
+      });
+
+      setTimeout(() => {
+        setInviteToast(null);
+      }, 8000);
+    } catch (err) {
+      console.error('Failed to page responder:', err);
+    } finally {
+      setPaging(false);
+    }
+  };
 
   // Live MTTR timer — computed client-side from startedAt
   useEffect(() => {
-    if (!incident || incident.resolvedAt) {
-      if (incident?.mttrSeconds) setElapsed(incident.mttrSeconds);
-      return;
-    }
+    if (!incident || incident.resolvedAt) return;
 
     const interval = setInterval(() => {
-      setElapsed(Math.floor((Date.now() - incident.startedAt) / 1000));
+      setLiveElapsed(Math.floor((Date.now() - incident.startedAt) / 1000));
     }, 1000);
 
     return () => clearInterval(interval);
@@ -147,6 +212,24 @@ export function IncidentBanner({ incident, connectionStatus, llmLatency }: Incid
                 {formatTime(elapsed)}
               </span>
             </div>
+
+            {/* Page Responder CTA */}
+            <button
+              type="button"
+              onClick={handlePageResponder}
+              disabled={paging}
+              className="flex items-center gap-1.5 ml-1.5 px-2.5 py-1 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/35 text-[11px] font-bold transition cursor-pointer shadow-sm active:scale-95 disabled:opacity-50"
+              title="Page on-call responder & share direct War Room invite"
+            >
+              <span>📟</span>
+              <span>
+                {paging
+                  ? 'Paging...'
+                  : CURRENT_USER_ID === 'lead_dev'
+                    ? '+ Page SRE'
+                    : '+ Page Lead'}
+              </span>
+            </button>
           </div>
         ) : (
           <div className="flex items-center gap-2 text-xs text-slate-400 bg-slate-900/60 px-3 py-1.5 rounded-xl border border-white/[0.06]">
@@ -170,26 +253,95 @@ export function IncidentBanner({ incident, connectionStatus, llmLatency }: Incid
           </span>
         </div>
 
-        {/* Nexconn status */}
-        <div className="hidden md:flex items-center gap-1.5 text-[11px] bg-blue-950/30 px-2.5 py-1 rounded-lg border border-blue-500/20 text-blue-300">
-          <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500" />
-          </span>
-          <span className="font-medium">Nexconn IM</span>
-        </div>
+        {/* Nexconn status & Kicked warning */}
+        {nexconnStatus === 'kicked' ? (
+          <div
+            className="flex items-center gap-1.5 text-[11px] bg-rose-500/20 border border-rose-500/40 text-rose-300 px-2.5 py-1 rounded-lg animate-pulse"
+            title="Another tab connected with this same userId"
+          >
+            <span>⚠️</span>
+            <span className="font-bold">Socket Dropped</span>
+            <span className="hidden lg:inline text-rose-400/80">(kick: same user in 2 tabs)</span>
+          </div>
+        ) : nexconnStatus === 'disconnected' ? (
+          <div className="flex items-center gap-1.5 text-[11px] bg-amber-500/15 border border-amber-500/30 text-amber-300 px-2.5 py-1 rounded-lg">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+            <span>Reconnecting...</span>
+          </div>
+        ) : (
+          <div className="hidden md:flex items-center gap-1.5 text-[11px] bg-blue-950/30 px-2.5 py-1 rounded-lg border border-blue-500/20 text-blue-300">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500" />
+            </span>
+            <span className="font-medium">Nexconn IM</span>
+          </div>
+        )}
 
-        {/* Current user chip */}
+        {/* Current user chip & switcher */}
         <div className="flex items-center gap-2 pl-2 border-l border-white/[0.08]">
-          <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-[11px] font-bold text-white shadow">
-            LD
+          <div
+            className={`w-7 h-7 rounded-full bg-gradient-to-tr ${currentUser.gradient} flex items-center justify-center text-[11px] font-bold text-white shadow`}
+          >
+            {currentUser.initials}
           </div>
           <div className="hidden xl:block text-left">
-            <div className="text-xs font-semibold text-slate-200">@lead_dev</div>
-            <div className="text-[9px] font-bold text-emerald-400 uppercase tracking-wider">Commander</div>
+            <div className="text-xs font-semibold text-slate-200">@{currentUser.id}</div>
+            <div className="text-[9px] font-bold text-emerald-400 uppercase tracking-wider">
+              {currentUser.role}
+            </div>
           </div>
+          <button
+            type="button"
+            onClick={() => {
+              const next = CURRENT_USER_ID === 'lead_dev' ? 'sre_oncall' : 'lead_dev';
+              setSessionUserId(next);
+            }}
+            className="text-[10px] font-mono text-slate-400 hover:text-white px-1.5 py-0.5 rounded bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.06] transition cursor-pointer"
+            title="Switch tab identity between @lead_dev and @sre_oncall"
+          >
+            ⇄ Switch
+          </button>
         </div>
       </div>
+
+      {/* 1-Click Responder Invite Toast Modal */}
+      {inviteToast && (
+        <div className="fixed top-16 right-6 z-50 flex items-center gap-3 bg-[#0d1322]/95 border border-indigo-500/40 rounded-xl px-4 py-3 shadow-2xl shadow-black/80 backdrop-blur-md animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="flex items-center gap-2.5">
+            <span className="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 flex items-center justify-center text-xs font-black">
+              ✓
+            </span>
+            <div>
+              <p className="text-xs font-bold text-slate-100 flex items-center gap-1.5">
+                <span>Paged @{inviteToast.target} into War Room</span>
+                <span className="text-[10px] font-mono text-emerald-400 font-normal">
+                  (Link Copied)
+                </span>
+              </p>
+              <p className="text-[10px] text-slate-400 font-mono truncate max-w-[240px]">
+                {inviteToast.link}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 pl-2 border-l border-white/[0.08]">
+            <button
+              type="button"
+              onClick={() => window.open(inviteToast.link, '_blank')}
+              className="px-2.5 py-1 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 text-xs font-black transition cursor-pointer shadow shadow-emerald-500/20 flex items-center gap-1"
+            >
+              <span>Open Tab ↗</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setInviteToast(null)}
+              className="text-slate-400 hover:text-white text-xs px-1.5 py-1 rounded cursor-pointer"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
     </header>
   );
 }

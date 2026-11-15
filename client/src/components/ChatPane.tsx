@@ -66,6 +66,13 @@ export function ChatPane({ incident, onIncidentUpdated }: ChatPaneProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isUserScrolledUpRef = useRef(false);
+  const incidentRef = useRef(incident);
+  const onIncidentUpdatedRef = useRef(onIncidentUpdated);
+
+  useEffect(() => {
+    incidentRef.current = incident;
+    onIncidentUpdatedRef.current = onIncidentUpdated;
+  }, [incident, onIncidentUpdated]);
 
   // Convert incoming Nexconn message to local format
   const convertNexconnMessage = useCallback((msg: ParsedChatMessage): ChatMessage => {
@@ -148,7 +155,12 @@ export function ChatPane({ incident, onIncidentUpdated }: ChatPaneProps) {
   useEffect(() => {
     if (!incidentId) return;
 
-    const CONTROL_TYPES = new Set(['TYPING_INDICATOR', 'THREAD_REPLY', 'CARD_ANNOTATION']);
+    const CONTROL_TYPES = new Set([
+      'TYPING_INDICATOR',
+      'THREAD_REPLY',
+      'CARD_ANNOTATION',
+      'INCIDENT_SYNC',
+    ]);
 
     // Load channel history
     nexconn.loadHistory(incidentId).then((history) => {
@@ -213,6 +225,55 @@ export function ChatPane({ incident, onIncidentUpdated }: ChatPaneProps) {
           ...prev,
           [cardId]: typeof serverCount === 'number' ? serverCount : (prev[cardId] || 0) + 1,
         }));
+        return;
+      }
+
+      // 4. Live Multi-Device Incident State Sync (cross-tab state, MTTR lock, and ActionCard execution status)
+      if (incoming.customType === 'INCIDENT_SYNC' && incoming.customData) {
+        const sync = incoming.customData;
+        const targetIncidentId = (sync.incidentId as string) || incidentId;
+
+        if (targetIncidentId === incidentId) {
+          const cur = incidentRef.current;
+          if (cur) {
+            onIncidentUpdatedRef.current({
+              ...cur,
+              status: (sync.status as Incident['status']) || cur.status,
+              startedAt: (sync.startedAt as number) || cur.startedAt,
+              resolvedAt: (sync.resolvedAt as number) ?? cur.resolvedAt,
+              mttrSeconds: (sync.mttrSeconds as number) ?? cur.mttrSeconds,
+            });
+          }
+
+          if (sync.actionCardStatus || sync.status === 'MITIGATING' || sync.status === 'RESOLVED') {
+            const nextCardStatus =
+              (sync.actionCardStatus as string) ||
+              (sync.status === 'RESOLVED'
+                ? 'EXECUTED_BY_HUMAN'
+                : sync.status === 'MITIGATING'
+                  ? 'EXECUTING'
+                  : undefined);
+
+            setMessages((prev) =>
+              prev.map((m) => {
+                if (m.agentResponse?.customType === 'ACTION_CARD' && m.agentResponse.customData) {
+                  return {
+                    ...m,
+                    agentResponse: {
+                      ...m.agentResponse,
+                      customData: {
+                        ...m.agentResponse.customData,
+                        status: nextCardStatus || m.agentResponse.customData.status,
+                        approvedBy: (sync.approvedBy as string) || m.agentResponse.customData.approvedBy,
+                      },
+                    },
+                  };
+                }
+                return m;
+              }),
+            );
+          }
+        }
         return;
       }
 

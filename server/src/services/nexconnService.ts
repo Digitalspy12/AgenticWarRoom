@@ -165,6 +165,89 @@ export async function sendGroupMessage(params: {
   }
 }
 
+/**
+ * Add user(s) to an existing group channel directly.
+ * POST /v4/group-channel/join
+ */
+export async function addUserToGroupChannel(
+  channelId: string,
+  userIds: string[],
+): Promise<void> {
+  const { baseUrl } = getCredentials();
+  const url = `${baseUrl}/v4/group-channel/join`;
+
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({
+        channelId,
+        userIds,
+      }),
+    });
+
+    const data = (await res.json()) as { code: number; msg?: string };
+    if (data.code !== 0) {
+      console.warn(`[Nexconn] addUserToGroupChannel warning for ${channelId}:`, data);
+    } else {
+      console.log(`[Nexconn] Added users to ${channelId}:`, userIds);
+    }
+  } catch (err) {
+    console.error(`[Nexconn] Failed to add users to ${channelId}:`, err);
+  }
+}
+
+/**
+ * Broadcast incident state sync event over the group channel WebSocket.
+ */
+export async function broadcastIncidentSync(
+  channelId: string,
+  payload: Record<string, unknown>,
+): Promise<void> {
+  await sendGroupMessage({
+    channelId,
+    text: `⚡ INCIDENT STATE SYNC: ${payload.status || 'UPDATE'}`,
+    customType: 'INCIDENT_SYNC',
+    customData: payload,
+    agentName: '⚡ SYSTEM',
+  });
+}
+
+/**
+ * Update group channel metadata / profile introduction.
+ * POST /v4/group-channel/profile/update
+ */
+export async function updateGroupMetadata(
+  channelId: string,
+  meta: Record<string, string>,
+): Promise<void> {
+  const { baseUrl } = getCredentials();
+  const url = `${baseUrl}/v4/group-channel/profile/update`;
+
+  try {
+    const summary = Object.entries(meta)
+      .map(([k, v]) => `${k}=${v}`)
+      .join('; ');
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({
+        channelId,
+        groupProfile: {
+          introduction: `Incident State: ${summary}`.slice(0, 500),
+        },
+      }),
+    });
+
+    const data = (await res.json()) as { code: number; msg?: string };
+    if (data.code !== 0) {
+      console.debug(`[Nexconn] updateGroupMetadata note for ${channelId}:`, data.msg || data.code);
+    }
+  } catch (err) {
+    console.debug(`[Nexconn] Failed to update group profile for ${channelId}:`, err);
+  }
+}
+
 export function getPublicConfig() {
   const { appKey } = getCredentials();
   return { appKey };

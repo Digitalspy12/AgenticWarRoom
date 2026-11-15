@@ -3,8 +3,8 @@ import { ChaosDrawer } from './components/ChaosDrawer';
 import { IncidentBanner } from './components/IncidentBanner';
 import { ChatPane } from './components/ChatPane';
 import { TelemetryPane } from './components/TelemetryPane';
-import { healthCheck } from './lib/api';
-import { nexconn } from './lib/nexconnClient';
+import { healthCheck, getIncident, listIncidents } from './lib/api';
+import { nexconn, type NexconnConnectionState } from './lib/nexconnClient';
 import { CURRENT_USER_ID } from './lib/constants';
 import type { Incident } from './lib/types';
 import './App.css';
@@ -13,6 +13,7 @@ function App() {
   const [activeIncident, setActiveIncident] = useState<Incident | null>(null);
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'error'>('connecting');
+  const [nexconnStatus, setNexconnStatus] = useState<NexconnConnectionState>('connecting');
   const [llmLatency, setLlmLatency] = useState<number | null>(null);
 
   // Health check & Nexconn connect on mount
@@ -24,10 +25,17 @@ function App() {
       })
       .catch(() => setConnectionStatus('error'));
 
+    // Listen to real-time Nexconn connection status & kicked states
+    const unsubStatus = nexconn.onConnectionStatus((state) => {
+      setNexconnStatus(state);
+    });
+
     // Connect user to Nexconn Chat
     nexconn.connect(CURRENT_USER_ID).catch((err) => {
       console.warn('[Nexconn] Connect error on start:', err);
     });
+
+    return () => unsubStatus();
   }, []);
 
   // Track incident in the list
@@ -39,6 +47,43 @@ function App() {
       return [incident, ...prev];
     });
   }, []);
+
+  // Auto-load incident from URL parameter (?inc=<id>) or load existing incidents
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const incId = params.get('inc') || params.get('incident');
+
+    if (incId) {
+      getIncident(incId)
+        .then((inc) => {
+          handleIncidentCreated(inc);
+        })
+        .catch((err) => console.warn('Could not load incident from URL:', err));
+    }
+
+    listIncidents()
+      .then((list) => {
+        if (list && list.length > 0) {
+          setIncidents((prev) => {
+            const map = new Map(prev.map((i) => [i.id, i]));
+            list.forEach((item) => {
+              if (!map.has(item.id)) {
+                map.set(item.id, item as Incident);
+              }
+            });
+            return Array.from(map.values());
+          });
+
+          // If no URL param, load latest incident if none active
+          if (!incId) {
+            getIncident(list[0].id)
+              .then((latest) => setActiveIncident((cur) => cur ?? latest))
+              .catch(() => {});
+          }
+        }
+      })
+      .catch((err) => console.warn('Could not list incidents:', err));
+  }, [handleIncidentCreated]);
 
   // Update incident state
   const handleIncidentUpdated = useCallback((incident: Incident) => {
@@ -52,6 +97,7 @@ function App() {
       <IncidentBanner
         incident={activeIncident}
         connectionStatus={connectionStatus}
+        nexconnStatus={nexconnStatus}
         llmLatency={llmLatency}
       />
 

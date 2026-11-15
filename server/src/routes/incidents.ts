@@ -9,7 +9,13 @@ import { Router, type Request, type Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { getScenario, getAllScenarioIds, type ScenarioId } from '../services/chaosEngine.js';
 import { runTriagePipeline, type PipelineResult } from '../services/agentPipeline.js';
-import { createGroupChannel, sendGroupMessage } from '../services/nexconnService.js';
+import {
+  createGroupChannel,
+  sendGroupMessage,
+  addUserToGroupChannel,
+  broadcastIncidentSync,
+  updateGroupMetadata,
+} from '../services/nexconnService.js';
 import { promptInteractiveAgent, type IncidentContext } from '../services/llmRouter.js';
 
 const router = Router();
@@ -240,11 +246,10 @@ router.post('/trigger', async (req: Request, res: Response) => {
   // Run agent pipeline asynchronously
   incident.status = 'DIAGNOSING';
   (async () => {
-    // 1. Provision Nexconn Group Channel & post system alert
+    // 1. Provision Nexconn Group Channel & post system alert (invites all on-call engineers)
     try {
-      await createGroupChannel(incidentId, `Incident: ${scenario.title}`, [
-        commanderId || 'lead_dev',
-      ]);
+      const activeResponders = Array.from(new Set([commanderId || 'lead_dev', 'lead_dev', 'sre_oncall']));
+      await createGroupChannel(incidentId, `Incident: ${scenario.title}`, activeResponders);
       await sendGroupMessage({
         channelId: incidentId,
         text: `🚨 ALERT: ${scenario.title}\n\nSeverity: ${scenario.severity}`,
@@ -288,6 +293,13 @@ router.post('/trigger', async (req: Request, res: Response) => {
       incident.pipelineResult = result;
       incident.status = 'AWAITING_APPROVAL';
       console.log(`[Pipeline] ${incidentId}: Pipeline complete. usedFallback=${result.usedFallback}`);
+
+      // Broadcast AWAITING_APPROVAL state to all open tabs
+      broadcastIncidentSync(incidentId, {
+        incidentId,
+        status: 'AWAITING_APPROVAL',
+        startedAt: incident.startedAt,
+      }).catch((err) => console.warn('[Nexconn] AWAITING_APPROVAL broadcast failed:', err));
     } catch (err) {
       console.error(`[Pipeline] ${incidentId}: Pipeline failed`, err);
     }
@@ -347,15 +359,32 @@ router.post('/:id/execute', (req: Request, res: Response) => {
   if (incident.status !== 'AWAITING_APPROVAL') {
     res.status(409).json({
       error: `Cannot execute: incident is in ${incident.status} state`,
+      status: incident.status,
     });
     return;
   }
 
   const { userId } = req.body as { userId?: string };
+  const approver = userId || 'lead_dev';
 
   // State transition: AWAITING_APPROVAL → MITIGATING → RESOLVED
   incident.status = 'MITIGATING';
-  console.log(`[Incident] ${incident.id}: Remediation approved by ${userId || 'unknown'}`);
+  console.log(`[Incident] ${incident.id}: Remediation approved by ${approver}`);
+
+  // Immediately broadcast MITIGATING state so all open tabs lock buttons and update banner
+  broadcastIncidentSync(incident.id, {
+    incidentId: incident.id,
+    status: 'MITIGATING',
+    approvedBy: approver,
+    startedAt: incident.startedAt,
+    actionCardStatus: 'EXECUTING',
+  }).catch((err) => console.warn('[Nexconn] MITIGATING sync broadcast failed:', err));
+
+  // Also update group channel metadata for persistent state
+  updateGroupMetadata(incident.id, {
+    ext_status: 'MITIGATING',
+    ext_approver: approver,
+  }).catch((err) => console.warn('[Nexconn] updateGroupMetadata MITIGATING failed:', err));
 
   // Simulate remediation execution (2 seconds)
   setTimeout(() => {
@@ -366,17 +395,35 @@ router.post('/:id/execute', (req: Request, res: Response) => {
     // Update the action card status
     if (incident.pipelineResult?.deployBot?.customData) {
       incident.pipelineResult.deployBot.customData.status = 'EXECUTED_BY_HUMAN';
-      incident.pipelineResult.deployBot.customData.approvedBy = userId || 'lead_dev';
+      incident.pipelineResult.deployBot.customData.approvedBy = approver;
       incident.pipelineResult.deployBot.customData.executedAt = new Date().toISOString();
     }
 
     // Broadcast resolution message to Nexconn channel
     sendGroupMessage({
       channelId: incident.id,
-      text: `✅ INCIDENT RESOLVED — Remediation executed by ${userId || 'lead_dev'}. MTTR: ${incident.mttrSeconds}s`,
+      text: `✅ INCIDENT RESOLVED — Remediation executed by @${approver}. MTTR: ${incident.mttrSeconds}s`,
       customType: 'SYSTEM_ALERT',
       agentName: '⚡ SYSTEM',
     }).catch((err) => console.warn('[Nexconn] Resolution broadcast failed:', err));
+
+    // Broadcast INCIDENT_SYNC for RESOLVED
+    broadcastIncidentSync(incident.id, {
+      incidentId: incident.id,
+      status: 'RESOLVED',
+      approvedBy: approver,
+      startedAt: incident.startedAt,
+      resolvedAt: incident.resolvedAt,
+      mttrSeconds: incident.mttrSeconds,
+      actionCardStatus: 'EXECUTED_BY_HUMAN',
+    }).catch((err) => console.warn('[Nexconn] RESOLVED sync broadcast failed:', err));
+
+    // Update group channel metadata
+    updateGroupMetadata(incident.id, {
+      ext_status: 'RESOLVED',
+      ext_approver: approver,
+      ext_mttr: String(incident.mttrSeconds),
+    }).catch((err) => console.warn('[Nexconn] updateGroupMetadata RESOLVED failed:', err));
 
     console.log(`[Incident] ${incident.id}: RESOLVED in ${incident.mttrSeconds}s`);
   }, 2000);
@@ -385,7 +432,71 @@ router.post('/:id/execute', (req: Request, res: Response) => {
     incidentId: incident.id,
     status: 'MITIGATING',
     message: 'Remediation executing...',
+    approvedBy: approver,
   });
+});
+
+/**
+ * POST /api/incidents/:id/invite
+ * Invite a responder into the war room (e.g. Lead Dev invites SRE On-Call)
+ */
+router.post('/:id/invite', async (req: Request, res: Response) => {
+  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const incident = incidents.get(id);
+  if (!incident) {
+    res.status(404).json({ error: 'Incident not found' });
+    return;
+  }
+
+  const { targetUserId = 'sre_oncall', invitedBy = 'lead_dev' } = req.body as {
+    targetUserId?: string;
+    invitedBy?: string;
+  };
+
+  try {
+    // 1. Add user to Nexconn group channel
+    await addUserToGroupChannel(incident.id, [targetUserId]);
+
+    // 2. Post visible chat announcement in the channel
+    await sendGroupMessage({
+      channelId: incident.id,
+      text: `📟 @${invitedBy} paged @${targetUserId} into the war room.`,
+      customType: 'SYSTEM_ALERT',
+      agentName: '⚡ SYSTEM',
+    });
+
+    // 3. Broadcast INCIDENT_SYNC snapshot
+    await broadcastIncidentSync(incident.id, {
+      incidentId: incident.id,
+      status: incident.status,
+      startedAt: incident.startedAt,
+      resolvedAt: incident.resolvedAt,
+      mttrSeconds: incident.mttrSeconds,
+      title: incident.title,
+      severity: incident.severity,
+      metrics: incident.metrics,
+      actionCardStatus: incident.pipelineResult?.deployBot?.customData?.status,
+    });
+
+    // Construct direct 1-click link
+    const host = req.get('host') || 'localhost:5173';
+    const clientHost = host.includes(':3001') ? host.replace(':3001', ':5173') : host;
+    const protocol = req.protocol || 'http';
+    const inviteLink = `${protocol}://${clientHost}/?inc=${incident.id}&as=${targetUserId}`;
+
+    console.log(`[Incident] ${incident.id}: @${invitedBy} paged @${targetUserId} -> ${inviteLink}`);
+
+    res.json({
+      success: true,
+      incidentId: incident.id,
+      targetUserId,
+      invitedBy,
+      inviteLink,
+    });
+  } catch (err) {
+    console.error(`[Incident] Failed to invite responder to ${incident.id}:`, err);
+    res.status(500).json({ error: 'Failed to invite responder' });
+  }
 });
 
 /**
