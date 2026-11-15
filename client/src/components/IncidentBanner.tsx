@@ -2,7 +2,7 @@
 // Incident Banner — Cockpit Navigation & Status Bar
 // ============================================
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { CURRENT_USER_ID, WARROOM_USERS, setSessionUserId } from '../lib/constants';
 import { inviteResponder } from '../lib/api';
 import type { Incident } from '../lib/types';
@@ -33,11 +33,26 @@ export function IncidentBanner({
       : 0,
   );
   const [paging, setPaging] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
   const [inviteToast, setInviteToast] = useState<{
     link: string;
     target: string;
     copied: boolean;
   } | null>(null);
+
+  // Close mini user window on outside click
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setShowUserMenu(false);
+      }
+    }
+    if (showUserMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showUserMenu]);
 
   const elapsed = incident?.resolvedAt
     ? (incident.mttrSeconds ?? Math.floor((incident.resolvedAt - incident.startedAt) / 1000))
@@ -51,10 +66,13 @@ export function IncidentBanner({
     gradient: 'from-indigo-500 to-purple-500',
   };
 
+  const userIdx = WARROOM_USERS.findIndex((u) => u.id === CURRENT_USER_ID);
+  const nextUser = WARROOM_USERS[(userIdx >= 0 ? userIdx + 1 : 0) % WARROOM_USERS.length];
+
   const handlePageResponder = async () => {
     if (!incident || paging) return;
     setPaging(true);
-    const targetUserId = CURRENT_USER_ID === 'lead_dev' ? 'sre_oncall' : 'lead_dev';
+    const targetUserId = nextUser.id;
 
     try {
       const res = await inviteResponder(incident.id, {
@@ -219,15 +237,11 @@ export function IncidentBanner({
               onClick={handlePageResponder}
               disabled={paging}
               className="flex items-center gap-1.5 ml-1.5 px-2.5 py-1 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/35 text-[11px] font-bold transition cursor-pointer shadow-sm active:scale-95 disabled:opacity-50"
-              title="Page on-call responder & share direct War Room invite"
+              title={`Page @${nextUser.id} & share direct War Room invite`}
             >
               <span>📟</span>
               <span>
-                {paging
-                  ? 'Paging...'
-                  : CURRENT_USER_ID === 'lead_dev'
-                    ? '+ Page SRE'
-                    : '+ Page Lead'}
+                {paging ? 'Paging...' : `+ Page @${nextUser.id}`}
               </span>
             </button>
           </div>
@@ -278,30 +292,114 @@ export function IncidentBanner({
           </div>
         )}
 
-        {/* Current user chip & switcher */}
-        <div className="flex items-center gap-2 pl-2 border-l border-white/[0.08]">
-          <div
-            className={`w-7 h-7 rounded-full bg-gradient-to-tr ${currentUser.gradient} flex items-center justify-center text-[11px] font-bold text-white shadow`}
-          >
-            {currentUser.initials}
-          </div>
-          <div className="hidden xl:block text-left">
-            <div className="text-xs font-semibold text-slate-200">@{currentUser.id}</div>
-            <div className="text-[9px] font-bold text-emerald-400 uppercase tracking-wider">
-              {currentUser.role}
-            </div>
-          </div>
+        {/* Current user chip & Interactive Roster Switcher */}
+        <div className="relative pl-2 border-l border-white/[0.08]" ref={userMenuRef}>
           <button
             type="button"
-            onClick={() => {
-              const next = CURRENT_USER_ID === 'lead_dev' ? 'sre_oncall' : 'lead_dev';
-              setSessionUserId(next);
-            }}
-            className="text-[10px] font-mono text-slate-400 hover:text-white px-1.5 py-0.5 rounded bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.06] transition cursor-pointer"
-            title="Switch tab identity between @lead_dev and @sre_oncall"
+            onClick={() => setShowUserMenu((v) => !v)}
+            className="flex items-center gap-2 px-2 py-1 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] transition cursor-pointer select-none"
+            title="Click to switch persona or launch dedicated tab"
           >
-            ⇄ Switch
+            <div
+              className={`w-7 h-7 rounded-full bg-gradient-to-tr ${currentUser.gradient} flex items-center justify-center text-[11px] font-bold text-white shadow`}
+            >
+              {currentUser.initials}
+            </div>
+            <div className="hidden xl:block text-left">
+              <div className="text-xs font-semibold text-slate-200 flex items-center gap-1">
+                <span>@{currentUser.id}</span>
+                <span className="text-[10px] text-slate-400">▾</span>
+              </div>
+              <div className="text-[9px] font-bold text-emerald-400 uppercase tracking-wider">
+                {currentUser.role}
+              </div>
+            </div>
           </button>
+
+          {/* Mini Window — Persona Selector & Multi-Tab Launcher */}
+          {showUserMenu && (
+            <div className="absolute right-0 top-full mt-2 w-72 bg-[#0c1222]/98 backdrop-blur-xl border border-white/[0.12] rounded-2xl shadow-2xl shadow-black/90 p-3 z-50 text-slate-200 animate-in fade-in zoom-in-95 duration-150">
+              <div className="flex items-center justify-between pb-2 mb-2 border-b border-white/[0.08]">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs">👥</span>
+                  <span className="text-xs font-bold text-slate-100">War Room Personas</span>
+                </div>
+                <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-300 font-bold border border-blue-500/25">
+                  {WARROOM_USERS.length} Roles
+                </span>
+              </div>
+
+              <div className="space-y-1.5">
+                {WARROOM_USERS.map((user) => {
+                  const isActive = user.id === CURRENT_USER_ID;
+                  return (
+                    <div
+                      key={user.id}
+                      className={`p-2 rounded-xl transition flex items-center justify-between gap-2 border ${
+                        isActive
+                          ? 'bg-blue-500/10 border-blue-500/40 shadow-inner shadow-blue-500/10'
+                          : 'bg-white/[0.02] border-white/[0.04] hover:bg-white/[0.06]'
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!isActive) setSessionUserId(user.id);
+                          setShowUserMenu(false);
+                        }}
+                        className="flex items-center gap-2.5 text-left flex-1 min-w-0 cursor-pointer"
+                        title={isActive ? 'Currently active' : `Switch this tab to @${user.id}`}
+                      >
+                        <div
+                          className={`w-7 h-7 rounded-full bg-gradient-to-tr ${user.gradient} flex items-center justify-center text-[11px] font-black text-white shrink-0 shadow`}
+                        >
+                          {user.initials}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-xs font-bold text-slate-100 flex items-center gap-1.5">
+                            <span className="truncate">{user.name}</span>
+                            {isActive && (
+                              <span className="text-[8px] font-mono px-1 py-0.2 rounded bg-emerald-500/20 text-emerald-400 font-bold border border-emerald-500/30">
+                                ACTIVE
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[10px] font-mono text-slate-400 flex items-center gap-1">
+                            <span>@{user.id}</span>
+                            <span>•</span>
+                            <span className="text-indigo-400 font-semibold">{user.role}</span>
+                          </div>
+                        </div>
+                      </button>
+
+                      {/* Open in New Tab action */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const targetUrl = incident
+                            ? `${window.location.origin}/?inc=${incident.id}&as=${user.id}`
+                            : `${window.location.origin}/?as=${user.id}`;
+                          window.open(targetUrl, '_blank');
+                          setShowUserMenu(false);
+                        }}
+                        className="p-1.5 rounded-lg bg-white/[0.05] hover:bg-white/[0.12] text-slate-400 hover:text-white text-[11px] transition cursor-pointer"
+                        title={`Open new browser tab as @${user.id}`}
+                      >
+                        ↗
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="mt-2.5 pt-2 border-t border-white/[0.06] text-[10px] text-slate-400 text-center flex items-center justify-center gap-1.5">
+                <span>Click role to switch, or</span>
+                <span className="font-mono text-indigo-300 font-bold">↗</span>
+                <span>to open in new tab</span>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

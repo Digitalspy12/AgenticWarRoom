@@ -8,6 +8,7 @@
 export const WARROOM_USERS = [
   { id: 'lead_dev', name: 'Lead Dev', role: 'Commander', initials: 'LD', gradient: 'from-indigo-500 to-purple-500' },
   { id: 'sre_oncall', name: 'SRE On-Call', role: 'Responder', initials: 'SO', gradient: 'from-emerald-500 to-teal-500' },
+  { id: 'sec_ops', name: 'Security Lead', role: 'SecOps', initials: 'SL', gradient: 'from-rose-500 to-orange-500' },
 ] as const;
 
 export type WarRoomUserId = (typeof WARROOM_USERS)[number]['id'];

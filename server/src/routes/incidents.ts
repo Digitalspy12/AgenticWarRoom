@@ -248,7 +248,7 @@ router.post('/trigger', async (req: Request, res: Response) => {
   (async () => {
     // 1. Provision Nexconn Group Channel & post system alert (invites all on-call engineers)
     try {
-      const activeResponders = Array.from(new Set([commanderId || 'lead_dev', 'lead_dev', 'sre_oncall']));
+      const activeResponders = Array.from(new Set([commanderId || 'lead_dev', 'lead_dev', 'sre_oncall', 'sec_ops']));
       await createGroupChannel(incidentId, `Incident: ${scenario.title}`, activeResponders);
       await sendGroupMessage({
         channelId: incidentId,
