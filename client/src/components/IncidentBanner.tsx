@@ -5,6 +5,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { CURRENT_USER_ID, WARROOM_USERS, setSessionUserId } from '../lib/constants';
 import { inviteResponder } from '../lib/api';
+import { AudioBriefingPill } from './AudioBriefingPill';
 import type { Incident } from '../lib/types';
 import type { NexconnConnectionState } from '../lib/nexconnClient';
 
@@ -231,19 +232,25 @@ export function IncidentBanner({
               </span>
             </div>
 
-            {/* Page Responder CTA */}
-            <button
-              type="button"
-              onClick={handlePageResponder}
-              disabled={paging}
-              className="flex items-center gap-1.5 ml-1.5 px-2.5 py-1 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/35 text-[11px] font-bold transition cursor-pointer shadow-sm active:scale-95 disabled:opacity-50"
-              title={`Page @${nextUser.id} & share direct War Room invite`}
-            >
-              <span>📟</span>
-              <span>
-                {paging ? 'Paging...' : `+ Page @${nextUser.id}`}
-              </span>
-            </button>
+            {/* Context Action: Voice Debrief when resolved, Page Responder during active triage */}
+            {incident.status === 'RESOLVED' ? (
+              <div className="ml-1">
+                <AudioBriefingPill incident={incident} />
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={handlePageResponder}
+                disabled={paging}
+                className="flex items-center gap-1.5 ml-1.5 px-2.5 py-1 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/35 text-[11px] font-bold transition cursor-pointer shadow-sm active:scale-95 disabled:opacity-50"
+                title={`Page @${nextUser.id} & share direct War Room invite`}
+              >
+                <span>📟</span>
+                <span>
+                  {paging ? 'Paging...' : `+ Page @${nextUser.id}`}
+                </span>
+              </button>
+            )}
           </div>
         ) : (
           <div className="flex items-center gap-2 text-xs text-slate-400 bg-slate-900/60 px-3 py-1.5 rounded-xl border border-white/[0.06]">

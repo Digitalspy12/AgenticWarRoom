@@ -33,7 +33,10 @@ export function getSessionUserId(): string {
 export function setSessionUserId(userId: string): void {
   if (typeof window !== 'undefined') {
     window.sessionStorage.setItem('warroom_user_id', userId);
-    window.location.reload();
+    const url = new URL(window.location.href);
+    url.searchParams.set('as', userId);
+    url.searchParams.delete('user');
+    window.location.href = url.toString();
   }
 }
 

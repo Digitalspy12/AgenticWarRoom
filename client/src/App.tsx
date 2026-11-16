@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { ChaosDrawer } from './components/ChaosDrawer';
 import { IncidentBanner } from './components/IncidentBanner';
 import { ChatPane } from './components/ChatPane';
@@ -6,6 +6,7 @@ import { TelemetryPane } from './components/TelemetryPane';
 import { healthCheck, getIncident, listIncidents } from './lib/api';
 import { nexconn, type NexconnConnectionState } from './lib/nexconnClient';
 import { CURRENT_USER_ID } from './lib/constants';
+import { speechService } from './lib/speechService';
 import type { Incident } from './lib/types';
 import './App.css';
 
@@ -90,6 +91,20 @@ function App() {
     setActiveIncident(incident);
     setIncidents((prev) => prev.map((i) => (i.id === incident.id ? incident : i)));
   }, []);
+
+  // Guaranteed top-level audio debrief auto-play on incident resolution
+  const lastResolvedIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (activeIncident && activeIncident.status === 'RESOLVED') {
+      if (lastResolvedIdRef.current !== activeIncident.id) {
+        lastResolvedIdRef.current = activeIncident.id;
+        console.log('[WarRoom] Active incident resolved! Auto-activating executive audio briefing for:', activeIncident.id);
+        speechService.playBriefing(activeIncident);
+      }
+    } else if (activeIncident && activeIncident.status !== 'RESOLVED') {
+      lastResolvedIdRef.current = null;
+    }
+  }, [activeIncident]);
 
   return (
     <div className="h-screen flex flex-col bg-[var(--color-bg-dark)] text-[var(--color-text-primary)] overflow-hidden">

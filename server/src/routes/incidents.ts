@@ -17,6 +17,7 @@ import {
   updateGroupMetadata,
 } from '../services/nexconnService.js';
 import { promptInteractiveAgent, type IncidentContext } from '../services/llmRouter.js';
+import { streamNeuralSpeech, buildVerbalScript } from '../services/ttsService.js';
 
 const router = Router();
 
@@ -325,6 +326,62 @@ router.get('/:id', (req: Request, res: Response) => {
       ? incident.mttrSeconds
       : Math.floor((Date.now() - incident.startedAt) / 1000),
   });
+});
+
+/**
+ * GET /api/incidents/:id/audio
+ * Stream realistic studio-quality neural MP3 audio debrief
+ */
+router.get('/:id/audio', async (req: Request, res: Response) => {
+  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const incident = incidents.get(id);
+  const customScript = typeof req.query.script === 'string' ? req.query.script : null;
+
+  if (!incident && !customScript) {
+    res.status(404).json({ error: 'Incident not found' });
+    return;
+  }
+
+  const script = incident ? buildVerbalScript(incident) : (customScript ?? '');
+  if (!script.trim()) {
+    res.status(400).json({ error: 'No script text available for audio debrief' });
+    return;
+  }
+
+  try {
+    const { stream, close } = await streamNeuralSpeech(script);
+
+    res.setHeader('Content-Type', 'audio/mpeg');
+    res.setHeader('Cache-Control', 'public, max-age=1800');
+    stream.pipe(res);
+
+    stream.on('end', () => {
+      close();
+    });
+    stream.on('error', (err) => {
+      console.error('[TTS] Stream error:', err);
+      close();
+      if (!res.headersSent) res.status(500).end();
+    });
+  } catch (err) {
+    console.error('[TTS] Neural synthesis failed:', err);
+    res.status(500).json({ error: 'Neural speech synthesis failed' });
+  }
+});
+
+/**
+ * GET /api/incidents/:id/script
+ * Get cleaned verbal debrief script text
+ */
+router.get('/:id/script', (req: Request, res: Response) => {
+  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const incident = incidents.get(id);
+  if (!incident) {
+    res.status(404).json({ error: 'Incident not found' });
+    return;
+  }
+
+  res.json({ script: buildVerbalScript(incident) });
 });
 
 /**

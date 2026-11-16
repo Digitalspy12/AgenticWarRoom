@@ -7,10 +7,12 @@ import {
   executeRemediation,
   rejectFix,
   promptAgent,
+  getIncident,
   getCardThreads,
   getCardAnnotations,
 } from '../lib/api';
 import { CURRENT_USER_ID } from '../lib/constants';
+import { speechService } from '../lib/speechService';
 import { nexconn, type ParsedChatMessage } from '../lib/nexconnClient';
 import { DiagnosticLogCard } from './cards/DiagnosticLogCard';
 import { ActionCard } from './cards/ActionCard';
@@ -400,9 +402,26 @@ export function ChatPane({ incident, onIncidentUpdated }: ChatPaneProps) {
 
   const handleApprove = async () => {
     if (!incident) return;
+    speechService.unlockAudio();
     setExecuting(true);
     try {
       await executeRemediation(incident.id, CURRENT_USER_ID);
+      onIncidentUpdated({ ...incident, status: 'MITIGATING' });
+
+      // Fast-poll every 500ms to guarantee resolution detection within 2s even if remote WebSocket is delayed
+      const targetId = incident.id;
+      const startTime = Date.now();
+      const pollTimer = setInterval(async () => {
+        try {
+          const fresh = await getIncident(targetId);
+          onIncidentUpdated(fresh);
+          if (fresh.status === 'RESOLVED' || Date.now() - startTime > 10000) {
+            clearInterval(pollTimer);
+          }
+        } catch {
+          // ignore
+        }
+      }, 500);
     } catch (err) {
       console.error('Execute failed:', err);
     } finally {

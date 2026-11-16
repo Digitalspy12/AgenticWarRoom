@@ -2,6 +2,7 @@
 // Telemetry Pane — Right Panel (Cockpit Signals)
 // ============================================
 
+import { AudioBriefingPill } from './AudioBriefingPill';
 import type { Incident } from '../lib/types';
 
 interface TelemetryPaneProps {
@@ -24,6 +25,30 @@ export function TelemetryPane({ incident }: TelemetryPaneProps) {
   const downloadPostMortem = () => {
     if (!incident) return;
 
+    const logData = incident.pipelineResult?.logBot?.customData || {};
+    const dbData = incident.pipelineResult?.dbAgent?.customData || {};
+    const deployData = incident.pipelineResult?.deployBot?.customData || {};
+
+    const culpritLine = (logData.culpritLine as string) || (logData.service as string) || (logData.filePath as string) || 'N/A';
+    const errorSignature = (logData.errorSignature as string) || 'N/A';
+    const suggestedInvestigate = Array.isArray(logData.suggestedInvestigate)
+      ? (logData.suggestedInvestigate as string[]).join(', ')
+      : 'N/A';
+
+    const rootCause = (dbData.rootCause as string) || 'N/A';
+    const affectedServices = Array.isArray(dbData.affectedServices)
+      ? (dbData.affectedServices as string[]).join(', ')
+      : (dbData.affectedComponent as string) || 'N/A';
+    const propagationPath = Array.isArray(dbData.propagationPath)
+      ? (dbData.propagationPath as string[]).join(' ➔ ')
+      : 'N/A';
+
+    const actionTitle = (deployData.actionTitle as string) || (deployData.actionType as string) || 'Remediation Playbook';
+    const risk = (deployData.risk as string) || (deployData.riskLevel as string) || 'MEDIUM';
+    const command = (deployData.command as string) || (deployData.commandPreview as string) || 'N/A';
+    const approver = (deployData.approvedBy as string) || incident.commanderId || 'lead_dev';
+    const executedAt = deployData.executedAt ? String(deployData.executedAt) : incident.resolvedAt ? new Date(incident.resolvedAt).toISOString() : 'N/A';
+
     const rcaContent = `# INCIDENT POST-MORTEM REPORT
 **Incident ID**: ${incident.id}
 **Scenario**: ${incident.title}
@@ -44,20 +69,26 @@ export function TelemetryPane({ incident }: TelemetryPaneProps) {
 
 ---
 
-## 2. Agent Diagnosis & Remediation Chain
+## 2. Autonomous Agent Diagnosis & Remediation Chain
 ### Stage 1: @LogBot Diagnostic Log
-- Service: ${(incident.pipelineResult?.logBot?.customData?.service as string) || 'N/A'}
-- File: ${(incident.pipelineResult?.logBot?.customData?.filePath as string) || 'N/A'}
-- Error Signature: ${(incident.pipelineResult?.logBot?.customData?.errorSignature as string) || 'N/A'}
+- Offending Code / File: ${culpritLine}
+- Error Signature: ${errorSignature}
+- Suggested Target: ${suggestedInvestigate}
 
-### Stage 2: @DBAgent Root Cause
-- Affected Component: ${(incident.pipelineResult?.dbAgent?.customData?.affectedComponent as string) || 'N/A'}
-- Root Cause: ${(incident.pipelineResult?.dbAgent?.customData?.rootCause as string) || 'N/A'}
+### Stage 2: @DBAgent Root Cause Analysis
+- Root Cause: ${rootCause}
+- Affected Services: ${affectedServices}
+- Blast Radius Propagation: ${propagationPath}
 
-### Stage 3: @DeployBot Action Card
-- Action: ${(incident.pipelineResult?.deployBot?.customData?.actionType as string) || 'N/A'}
-- Command Preview: \`${(incident.pipelineResult?.deployBot?.customData?.commandPreview as string) || 'N/A'}\`
-- Approved By: @${(incident.pipelineResult?.deployBot?.customData?.approvedBy as string) || 'lead_dev'}
+### Stage 3: @DeployBot Action Playbook
+- Action: ${actionTitle}
+- Risk Level: ${risk}
+- Executed Command:
+\`\`\`bash
+${command}
+\`\`\`
+- Approved & Executed By: @${approver}
+- Executed At: ${executedAt}
 
 ---
 *Generated automatically by Agentic WarRoom via Nexconn Chat SDK.*
@@ -240,11 +271,14 @@ export function TelemetryPane({ incident }: TelemetryPaneProps) {
         </div>
       </div>
 
-      {/* Post-Mortem Export */}
-      <div className="p-4 space-y-2 mt-auto">
-        <h3 className="font-extrabold uppercase tracking-wider text-[11px] text-slate-200 flex items-center gap-1.5">
-          <span>📄</span> Incident Report
-        </h3>
+      {/* Post-Mortem Export & Audio Debrief */}
+      <div className="p-4 space-y-2.5 mt-auto">
+        <div className="flex items-center justify-between">
+          <h3 className="font-extrabold uppercase tracking-wider text-[11px] text-slate-200 flex items-center gap-1.5">
+            <span>📄</span> Incident Report
+          </h3>
+          {isResolved && <AudioBriefingPill incident={incident} />}
+        </div>
         <button
           onClick={downloadPostMortem}
           disabled={!isResolved}

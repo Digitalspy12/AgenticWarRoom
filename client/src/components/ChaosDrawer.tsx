@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { triggerIncident, getIncident } from '../lib/api';
 import type { Incident, ScenarioId } from '../lib/types';
 import { CURRENT_USER_ID, POLL_INTERVAL_MS, POLL_BACKOFF_MS } from '../lib/constants';
+import { speechService } from '../lib/speechService';
 
 interface ChaosDrawerProps {
   onIncidentCreated: (incident: Incident) => void;
@@ -63,6 +64,7 @@ export function ChaosDrawer({
   const [triggering, setTriggering] = useState<ScenarioId | null>(null);
 
   const handleTrigger = async (scenarioId: ScenarioId) => {
+    speechService.unlockAudio();
     setTriggering(scenarioId);
     try {
       const response = await triggerIncident({
