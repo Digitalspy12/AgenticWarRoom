@@ -27,7 +27,7 @@ Stable state transitions and telemetry rules for incident triage.
 | `DIAGNOSING` | `@LogBot` → `@DBAgent` → `@DeployBot` | Typing waves, Diagnostic cards streamed | Cards populate center pane |
 | `AWAITING_APPROVAL` | Human SRE (HITL) | Amber Banner, Action Card active | "Approve & Execute" CTA enabled |
 | `MITIGATING` | Backend Runner | Blue Banner, Executing command | Command spinner active |
-| `RESOLVED` | Cockpit / Post-Mortem | Green Banner, MTTR stopped | Post-Mortem download CTA visible |
+| `RESOLVED` | Cockpit / Post-Mortem | Green Banner, MTTR stopped | Post-Mortem download CTA visible, Voice Debrief plays automatically |
 
 ## 3. Metrics Invariants
 - `cpuPercent`: Spike during outage (85-98%), drops post-mitigation (<40%).

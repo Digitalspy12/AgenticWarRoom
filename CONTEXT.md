@@ -10,8 +10,8 @@ The flow: Ingest chaos outage → Chain autonomous agents (@LogBot → @DBAgent 
 | `02_chat-sdk-sync` | Nexconn Chat SDK Web integration, Group Channel, Token Auth | **Done** |
 | `03_interactivity` | Typing indicators, In-channel mention chips, Threaded drawer | **Done** |
 | `04_channel-metadata` | Nexconn channel metadata, cross-tab sync, pinned cards | **Done** |
-| `05_polish-demo` | Production hardening, voice briefings, demo runbook | **Active** |
+| `05_polish-demo` | Production hardening, voice briefings, demo runbook | **Done** |
 
 Factory (stable across runs): `_shared/{card-schemas.md, nexconn-contract.md, incident-states.md}`  
-Active Contract: [`stages/04_channel-metadata/CONTEXT.md`](stages/04_channel-metadata/CONTEXT.md) (Check passed: [`stages/04_channel-metadata/check.md`](stages/04_channel-metadata/check.md))
+Active Contract: [`stages/05_polish-demo/CONTEXT.md`](stages/05_polish-demo/CONTEXT.md) (Check passed: [`stages/05_polish-demo/check.md`](stages/05_polish-demo/check.md))
 

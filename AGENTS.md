@@ -17,7 +17,7 @@ Autonomous Multi-Agent Production Incident Triage Cockpit on Nexconn Chat SDK.
 | If you are... | Go to | Then check |
 |---|---|---|
 | Reviewing Phase 4 (Multiplayer War Room & Cross-Tab Sync) | [`stages/04_channel-metadata/CONTEXT.md`](stages/04_channel-metadata/CONTEXT.md) | `stages/04_channel-metadata/check.md` (PASSED) |
-| Working on Phase 5 (Production Polish, Voice Briefings & Demo Hardening) | [`stages/05_polish-demo/CONTEXT.md`](stages/05_polish-demo/CONTEXT.md) | `stages/05_polish-demo/check.md` |
+| Reviewing Phase 5 (Production Polish & Voice Debriefs) | [`stages/05_polish-demo/CONTEXT.md`](stages/05_polish-demo/CONTEXT.md) | `stages/05_polish-demo/check.md` (PASSED) |
 | Verifying or adding custom card payloads | [`_shared/card-schemas.md`](_shared/card-schemas.md) | `client/src/lib/types.ts` parity |
 | Checking Nexconn SDK / Platform API rules | [`_shared/nexconn-contract.md`](_shared/nexconn-contract.md) | `server/src/services/nexconnService.ts` |
 | Updating incident state machine | [`_shared/incident-states.md`](_shared/incident-states.md) | State transitions in client/server |
