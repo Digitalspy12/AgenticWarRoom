@@ -1,11 +1,18 @@
 {
-  "version": 1,
+  "version": 2,
   "skills": {
+    "humanizer": {
+      "source": "blader/humanizer",
+      "commit": "b48c832f0f809c1b5658edbb838c2521b72f2413",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "04cdabbcceaa7b5d4bd4b1ea02339013503d623b270b5b3b2e274837494d7134"
+    },
     "nexconn-chat": {
       "source": "NexconnAI-Dev/nexconn-skills",
       "sourceType": "github",
       "skillPath": "skills/nexconn-chat/SKILL.md",
-      "computedHash": "ad5ea1ef67237d0f5f1a69f73828e01ed32153cc032c3842ec416dadcaa4ee63"
+      "computedHash": ""
     }
   }
 }
