@@ -119,7 +119,7 @@ function App() {
       {/* ---- 3-Pane Cockpit ---- */}
       <div className="flex flex-1 overflow-hidden">
         {/* Left Pane: Chaos Simulator + Incident List */}
-        <div className="w-80 border-r border-white/[0.08] flex flex-col bg-[#0a0e1a]/95 shrink-0">
+        <div className="w-72 border-r border-white/[0.08] flex flex-col bg-[#0d1117] shrink-0">
           <ChaosDrawer
             onIncidentCreated={handleIncidentCreated}
             incidents={incidents}
@@ -132,7 +132,7 @@ function App() {
         </div>
 
         {/* Center Pane: War Room Chat */}
-        <div className="flex-1 flex flex-col bg-[#080d19] min-w-0 min-h-0">
+        <div className="flex-1 flex flex-col bg-[#090d13] min-w-0 min-h-0">
           <ChatPane
             key={activeIncident?.id ?? 'empty'}
             incident={activeIncident}
@@ -141,7 +141,7 @@ function App() {
         </div>
 
         {/* Right Pane: Telemetry & AI Reasoning */}
-        <div className="w-80 border-l border-white/[0.08] bg-[#0a0f1d]/95 shrink-0 hidden lg:block">
+        <div className="w-80 border-l border-white/[0.08] bg-[#0d1117] shrink-0 hidden lg:block">
           <TelemetryPane incident={activeIncident} />
         </div>
       </div>

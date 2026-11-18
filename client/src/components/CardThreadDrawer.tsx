@@ -6,6 +6,7 @@
 // and targeted agent Q&A within the card's context.
 
 import { useState, useEffect, useRef } from 'react';
+import { Pin, MessageSquare, X, CornerDownRight } from 'lucide-react';
 import {
   getCardThread,
   postCardThreadMessage,
@@ -157,22 +158,22 @@ export function CardThreadDrawer({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-xs transition-opacity animate-fade-in">
+    <div className="fixed inset-0 z-50 flex justify-end bg-black/60 transition-opacity animate-fade-in">
       {/* Backdrop overlay dismiss */}
       <div className="flex-1 cursor-pointer" onClick={onClose} />
 
       {/* Slide-over Container */}
-      <div className="w-full max-w-lg h-full bg-[#0d1222] border-l border-white/[0.1] shadow-2xl flex flex-col relative z-10 animate-slide-left font-sans">
+      <div className="w-full max-w-lg h-full bg-[#11151d] border-l border-white/[0.08] shadow-2xl flex flex-col relative z-10 animate-slide-left font-sans">
         {/* Drawer Header */}
-        <div className="p-4 border-b border-white/[0.08] bg-[#090d19] flex items-start justify-between gap-3 shrink-0">
+        <div className="p-3.5 border-b border-white/[0.08] bg-[#0d1117] flex items-start justify-between gap-3 shrink-0">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-300 border border-blue-500/30 font-bold">
-                Card Thread
+              <span className="text-[10px] font-mono uppercase px-1.5 py-0.2 rounded bg-white/[0.06] text-slate-300 border border-white/[0.08]">
+                Card thread
               </span>
-              <span className="text-xs font-mono font-bold text-slate-300">{agentName}</span>
+              <span className="text-xs font-mono font-medium text-slate-300">{agentName}</span>
             </div>
-            <h3 className="text-sm font-bold text-white tracking-tight">{cardTitle}</h3>
+            <h3 className="text-sm font-semibold text-white tracking-tight">{cardTitle}</h3>
             {cardSubtitle && (
               <p className="text-[11px] text-slate-400 font-mono mt-0.5 truncate max-w-md">
                 {cardSubtitle}
@@ -182,18 +183,19 @@ export function CardThreadDrawer({
 
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.08] transition cursor-pointer"
+            className="p-1 rounded-md text-slate-400 hover:text-white hover:bg-white/[0.06] transition cursor-pointer"
             title="Close thread (Esc)"
           >
-            ✕
+            <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Pinned Annotation Section */}
-        <div className="p-3 bg-[#11182c] border-b border-white/[0.06] shrink-0">
+        <div className="p-3 bg-[#161b24] border-b border-white/[0.06] shrink-0">
           <div className="flex items-center justify-between mb-1.5">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5 font-mono">
-              <span>📌</span> Pinned SRE Annotation
+            <span className="text-[10px] font-mono text-amber-400 flex items-center gap-1.5">
+              <Pin className="w-3 h-3" />
+              <span>Pinned SRE annotation</span>
             </span>
             {!isEditingAnnotation ? (
               <button
@@ -201,9 +203,9 @@ export function CardThreadDrawer({
                   setAnnotationText(annotation?.note || '');
                   setIsEditingAnnotation(true);
                 }}
-                className="text-[10px] font-mono text-slate-400 hover:text-amber-300 transition cursor-pointer"
+                className="text-[10px] font-mono text-slate-400 hover:text-slate-200 transition cursor-pointer"
               >
-                {annotation ? 'Edit Note' : '+ Add Note'}
+                {annotation ? 'Edit note' : '+ Add note'}
               </button>
             ) : (
               <button
@@ -221,21 +223,21 @@ export function CardThreadDrawer({
                 value={annotationText}
                 onChange={(e) => setAnnotationText(e.target.value)}
                 placeholder="Pin a note to this finding (e.g. 'Verified pool saturated in Grafana')..."
-                className="w-full h-16 bg-[#080c16] text-xs text-slate-200 p-2.5 rounded-xl border border-amber-500/30 focus:outline-none focus:border-amber-400 font-mono resize-none"
+                className="w-full h-16 bg-[#0d1117] text-xs text-slate-200 p-2 rounded-md border border-white/[0.1] focus:outline-none focus:border-amber-400/60 font-mono resize-none"
               />
               <div className="flex justify-end gap-2">
                 <button
                   onClick={handleSaveAnnotation}
                   disabled={savingAnnotation || !annotationText.trim()}
-                  className="px-3 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold transition disabled:opacity-50 cursor-pointer"
+                  className="px-3 py-1 rounded-md bg-[#202734] hover:bg-[#283142] border border-white/[0.1] text-slate-200 text-xs font-medium transition disabled:opacity-50 cursor-pointer"
                 >
-                  {savingAnnotation ? 'Pinning...' : 'Pin Note'}
+                  {savingAnnotation ? 'Pinning...' : 'Pin note'}
                 </button>
               </div>
             </div>
           ) : annotation ? (
-            <div className="bg-amber-500/10 border border-amber-500/25 rounded-xl p-2.5 text-xs text-amber-200 flex items-start gap-2 font-mono">
-              <span className="text-sm">📌</span>
+            <div className="bg-amber-500/10 border border-amber-500/20 rounded-md p-2 text-xs text-amber-200 flex items-start gap-2 font-mono">
+              <Pin className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
               <div className="flex-1 min-w-0">
                 <p className="leading-relaxed">{annotation.note}</p>
                 <div className="text-[10px] text-amber-300/70 mt-1">
@@ -244,16 +246,16 @@ export function CardThreadDrawer({
               </div>
             </div>
           ) : (
-            <div className="text-[11px] text-slate-400 italic">
-              No annotation pinned to this card. Click &quot;+ Add Note&quot; to attach findings.
+            <div className="text-[11px] text-slate-400">
+              No annotation pinned to this card. Click &quot;+ Add note&quot; to attach findings.
             </div>
           )}
         </div>
 
         {/* Quick Agent Prompts Bar */}
-        <div className="px-4 py-2.5 bg-[#090e1c] border-b border-white/[0.06] shrink-0">
-          <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
-            Suggested Inquiries for {agentName}:
+        <div className="px-3.5 py-2 bg-[#0d1117] border-b border-white/[0.06] shrink-0">
+          <div className="text-[10px] font-mono text-slate-400 mb-1.5">
+            Suggested inquiries for {agentName}:
           </div>
           <div className="flex flex-wrap gap-1.5">
             {getQuickPrompts().map((prompt, idx) => (
@@ -261,24 +263,25 @@ export function CardThreadDrawer({
                 key={idx}
                 type="button"
                 onClick={() => handleSendMessage(prompt)}
-                className="text-[10px] font-mono px-2 py-1 rounded-lg bg-white/[0.05] hover:bg-blue-600/20 text-slate-300 hover:text-blue-300 border border-white/[0.08] hover:border-blue-500/30 transition cursor-pointer text-left"
+                className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#161b24] hover:bg-[#1c222e] text-slate-300 border border-white/[0.08] transition cursor-pointer text-left flex items-center gap-1"
               >
-                ⚡ {prompt}
+                <CornerDownRight className="w-3 h-3 text-slate-400" />
+                <span>{prompt}</span>
               </button>
             ))}
           </div>
         </div>
 
         {/* Messages Stream */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        <div className="flex-1 overflow-y-auto p-4 space-y-3">
           {messages.length === 0 && !agentThinking && (
             <div className="h-full flex flex-col items-center justify-center text-center p-6 text-slate-400">
-              <span className="text-3xl mb-2">💬</span>
-              <p className="text-xs font-semibold text-slate-300 mb-1">
-                Start a Focused Thread
+              <MessageSquare className="w-5 h-5 mb-2 text-slate-400" />
+              <p className="text-xs font-medium text-slate-300 mb-1">
+                Thread discussion
               </p>
               <p className="text-[11px] max-w-xs text-slate-400 leading-relaxed">
-                Ask {agentName} clarifying questions or coordinate with other on-call engineers regarding this specific finding.
+                Coordinate with on-call engineers or query {agentName} directly regarding this finding.
               </p>
             </div>
           )}
@@ -291,7 +294,7 @@ export function CardThreadDrawer({
                 className={`flex flex-col ${isUser ? 'items-end' : 'items-start'} space-y-1`}
               >
                 <div className="flex items-center gap-1.5 text-[10px] font-mono text-slate-400">
-                  <span className={m.isAgent ? 'text-blue-400 font-bold' : 'text-slate-300 font-bold'}>
+                  <span className={m.isAgent ? 'text-sky-300 font-medium' : 'text-slate-300 font-medium'}>
                     {m.isAgent ? m.agentName : `@${m.sender}`}
                   </span>
                   <span>•</span>
@@ -299,10 +302,10 @@ export function CardThreadDrawer({
                 </div>
 
                 <div
-                  className={`p-3 rounded-2xl text-xs max-w-[90%] leading-relaxed ${
+                  className={`p-2.5 rounded-lg text-xs max-w-[90%] leading-relaxed ${
                     isUser
-                      ? 'bg-blue-600/90 text-white rounded-tr-none shadow-md'
-                      : 'bg-[#151c30] text-slate-200 border border-white/[0.08] rounded-tl-none font-mono whitespace-pre-wrap'
+                      ? 'bg-[#1c222e] text-slate-100 border border-white/[0.1]'
+                      : 'bg-[#161b24] text-slate-200 border border-white/[0.06] font-mono whitespace-pre-wrap'
                   }`}
                 >
                   {m.text}
@@ -313,10 +316,10 @@ export function CardThreadDrawer({
 
           {/* Agent Thinking Indicator in Thread */}
           {agentThinking && (
-            <div className="flex items-start gap-2.5 p-3 rounded-xl bg-blue-950/30 border border-blue-500/30 text-blue-300 text-xs shadow-md animate-pulse">
-              <span className="animate-spin h-3.5 w-3.5 border-2 border-blue-400 border-t-transparent rounded-full shrink-0 mt-0.5" />
+            <div className="flex items-start gap-2 p-2.5 rounded-lg bg-sky-500/10 border border-sky-500/20 text-sky-300 text-xs">
+              <span className="animate-spin h-3.5 w-3.5 border-2 border-sky-400 border-t-transparent rounded-full shrink-0 mt-0.5" />
               <div className="font-mono text-[11px]">
-                <span className="font-bold">{agentName}</span> is analyzing thread context and formulating response...
+                <span className="font-medium">{agentName}</span> is analyzing thread context...
               </div>
             </div>
           )}
@@ -325,7 +328,7 @@ export function CardThreadDrawer({
         </div>
 
         {/* Thread Input Bar */}
-        <div className="p-3 bg-[#090d19] border-t border-white/[0.08] shrink-0">
+        <div className="p-3 bg-[#0d1117] border-t border-white/[0.08] shrink-0">
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -338,15 +341,15 @@ export function CardThreadDrawer({
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               placeholder={`Ask ${agentName} or reply in thread...`}
-              className="flex-1 bg-[#12192c] text-xs text-white placeholder:text-slate-400 px-3.5 py-2.5 rounded-xl border border-white/[0.1] focus:outline-none focus:border-blue-500"
+              className="flex-1 bg-[#161b24] text-xs text-white placeholder:text-slate-400 px-3 py-2 rounded-md border border-white/[0.08] focus:outline-none focus:border-white/[0.2]"
             />
             <button
               type="submit"
               disabled={!inputText.trim() || sending}
-              className={`px-3.5 py-2.5 rounded-xl text-xs font-bold transition ${
+              className={`px-3 py-2 rounded-md text-xs font-medium transition border ${
                 inputText.trim() && !sending
-                  ? 'bg-blue-600 hover:bg-blue-500 text-white cursor-pointer'
-                  : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                  ? 'bg-[#1c222e] hover:bg-[#222938] text-slate-200 border-white/[0.1] cursor-pointer'
+                  : 'bg-transparent text-slate-500 border-white/[0.05] cursor-not-allowed'
               }`}
             >
               Reply ↵

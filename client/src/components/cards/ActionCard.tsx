@@ -3,6 +3,7 @@
 // ============================================
 
 import { useState } from 'react';
+import { Terminal, Copy, Check, ShieldCheck, CheckCircle2 } from 'lucide-react';
 import { CardFooter } from './CardFooter';
 import type { CardAnnotation } from '../../lib/types';
 
@@ -54,64 +55,62 @@ export function ActionCard({
   const riskBadge = (risk: string) => {
     switch (risk.toUpperCase()) {
       case 'LOW':
-        return 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30';
+        return 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20';
       case 'MEDIUM':
-        return 'bg-amber-500/15 text-amber-300 border-amber-500/30';
+        return 'bg-amber-500/10 text-amber-300 border-amber-500/20';
       case 'HIGH':
       case 'CRITICAL':
-        return 'bg-rose-500/20 text-rose-300 border-rose-500/40 animate-pulse';
+        return 'bg-rose-500/10 text-rose-300 border-rose-500/25';
       default:
-        return 'bg-slate-500/15 text-slate-300 border-slate-500/30';
+        return 'bg-white/[0.05] text-slate-300 border-white/[0.08]';
     }
   };
 
   return (
-    <div className="bg-[#171424]/95 border border-orange-500/40 rounded-2xl p-4 shadow-2xl shadow-orange-950/25 text-sm space-y-3.5 relative overflow-hidden">
-      {/* Top Orange Accent */}
-      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-orange-500 via-amber-400 to-emerald-400" />
-
+    <div className="bg-[#161b24] border border-white/[0.08] rounded-lg p-4 text-xs space-y-3 relative">
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="flex items-center gap-2 mb-1 flex-wrap">
-            <span className="text-[10px] font-black uppercase tracking-widest text-orange-400 bg-orange-500/15 px-2 py-0.5 rounded-full border border-orange-500/30">
+            <span className="text-[10px] font-mono uppercase px-1.5 py-0.2 rounded bg-orange-500/10 text-orange-300 border border-orange-500/20">
               {actionType.replace(/_/g, ' ')}
             </span>
-            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${riskBadge(riskLevel)}`}>
+            <span className={`px-1.5 py-0.2 rounded text-[10px] font-mono border ${riskBadge(riskLevel)}`}>
               Risk: {riskLevel}
             </span>
-            <span className="text-xs text-slate-400 font-mono">@DeployBot</span>
+            <span className="text-[11px] text-slate-400 font-mono">@DeployBot</span>
           </div>
-          <p className="font-bold text-slate-100 text-sm leading-snug">{text}</p>
+          <p className="font-medium text-slate-100 text-xs leading-snug">{text}</p>
         </div>
       </div>
 
       {/* Target Scope */}
       {targetService && (
-        <div className="flex items-center gap-2 text-xs bg-[#0b0e1a] px-3 py-1.5 rounded-xl border border-white/[0.06] font-mono">
-          <span className="text-slate-400 text-[11px]">TARGET:</span>
-          <span className="text-orange-300 font-bold">{targetService}</span>
+        <div className="flex items-center gap-2 text-xs bg-[#11151d] px-2.5 py-1.5 rounded-md border border-white/[0.06] font-mono">
+          <span className="text-slate-400 text-[10px]">Target:</span>
+          <span className="text-orange-300 font-medium">{targetService}</span>
         </div>
       )}
 
       {/* Executable Terminal Command Preview */}
       {commandPreview && (
-        <div className="rounded-xl overflow-hidden border border-white/[0.08] bg-[#070912] shadow-inner">
-          <div className="bg-[#0e111d] px-3 py-1.5 flex items-center justify-between border-b border-white/[0.06]">
-            <div className="flex items-center gap-2">
-              <span className="text-xs">⚡</span>
-              <span className="text-[11px] font-bold text-slate-300 font-mono">
-                Remediation Playbook Script
+        <div className="rounded-md overflow-hidden border border-white/[0.08] bg-[#0a0d14]">
+          <div className="bg-[#11151d] px-3 py-1 flex items-center justify-between border-b border-white/[0.06]">
+            <div className="flex items-center gap-1.5">
+              <Terminal className="w-3.5 h-3.5 text-slate-400" />
+              <span className="text-[11px] text-slate-300 font-mono">
+                Remediation playbook script
               </span>
             </div>
             <button
               onClick={handleCopyCommand}
-              className="text-[10px] font-mono text-slate-400 hover:text-white px-2 py-0.5 rounded bg-white/[0.05] hover:bg-white/[0.1] transition cursor-pointer"
+              className="text-[10px] font-mono text-slate-400 hover:text-white px-1.5 py-0.5 rounded bg-white/[0.05] hover:bg-white/[0.1] transition cursor-pointer flex items-center gap-1"
             >
-              {copied ? '✓ Copied' : 'Copy'}
+              {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+              <span>{copied ? 'Copied' : 'Copy'}</span>
             </button>
           </div>
-          <div className="p-3 font-mono text-xs overflow-x-auto text-amber-300 leading-relaxed max-h-36">
+          <div className="p-3 font-mono text-xs overflow-x-auto text-amber-200/90 leading-relaxed max-h-36">
             <code>{commandPreview}</code>
           </div>
         </div>
@@ -119,8 +118,8 @@ export function ActionCard({
 
       {/* Rollback Plan */}
       {rollbackPlan && (
-        <div className="text-xs text-slate-300 bg-[#0c101d] p-2.5 rounded-xl border border-white/[0.06] font-mono flex items-start gap-2">
-          <span className="text-slate-400 font-bold shrink-0">Contingency:</span>
+        <div className="text-xs text-slate-300 bg-[#11151d] p-2 rounded-md border border-white/[0.06] font-mono flex items-start gap-2">
+          <span className="text-slate-400 shrink-0">Contingency:</span>
           <span className="text-slate-300">{rollbackPlan}</span>
         </div>
       )}
@@ -128,27 +127,22 @@ export function ActionCard({
       {/* HITL Action Bar */}
       <div className="pt-2 border-t border-white/[0.08] flex flex-wrap items-center justify-between gap-3">
         {isResolved ? (
-          <div className="flex items-center gap-2 text-emerald-400 font-bold text-xs py-1">
-            <span className="w-5 h-5 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-xs">
-              ✓
-            </span>
-            <span>Remediation Playbook Applied Successfully</span>
+          <div className="flex items-center gap-2 text-emerald-400 font-medium text-xs py-0.5">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            <span>Remediation playbook applied</span>
             {approvedBy && (
-              <span className="text-slate-400 font-normal font-mono">(Approved by @{approvedBy})</span>
+              <span className="text-slate-400 font-mono text-[10px]">(approved by @{approvedBy})</span>
             )}
           </div>
         ) : isMitigating ? (
-          <div className="flex items-center gap-2.5 text-blue-400 font-semibold text-xs py-1">
-            <span className="relative flex h-2.5 w-2.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-500" />
-            </span>
-            <span>Executing remediation commands on Kubernetes cluster...</span>
+          <div className="flex items-center gap-2 text-sky-400 text-xs py-0.5">
+            <span className="w-2 h-2 rounded-full bg-sky-400 animate-pulse" />
+            <span>Executing remediation commands on cluster...</span>
           </div>
         ) : (
           <>
             <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
-              <span className="text-amber-400">🛡️</span>
+              <ShieldCheck className="w-3.5 h-3.5 text-slate-400" />
               <span>Requires Incident Commander approval</span>
             </div>
 
@@ -157,7 +151,7 @@ export function ActionCard({
                 type="button"
                 onClick={onReject}
                 disabled={executing}
-                className="px-3 py-1.5 rounded-xl border border-slate-700 hover:bg-slate-800 text-slate-300 text-xs font-semibold transition cursor-pointer disabled:opacity-40"
+                className="px-3 py-1.5 rounded-md border border-white/[0.1] hover:bg-white/[0.05] text-slate-300 text-xs font-medium transition cursor-pointer disabled:opacity-40"
               >
                 Reject / Modify
               </button>
@@ -165,9 +159,9 @@ export function ActionCard({
                 type="button"
                 onClick={onApprove}
                 disabled={executing}
-                className="px-4 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 hover:to-teal-400 text-white text-xs font-extrabold transition shadow-lg shadow-emerald-500/25 flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transform active:scale-95"
+                className="px-3.5 py-1.5 rounded-md bg-[#238636] hover:bg-[#2ea043] text-white text-xs font-medium transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
               >
-                <span>⚡ Approve & Execute</span>
+                <span>Approve & Execute</span>
               </button>
             </div>
           </>
@@ -179,7 +173,7 @@ export function ActionCard({
         title={`Remediation Playbook: ${actionType.replace(/_/g, ' ')}`}
         subtitle={commandPreview || text}
         agentName="@DeployBot"
-        buttonClass="bg-orange-500/10 hover:bg-orange-500/20 text-orange-300 border-orange-500/20"
+        buttonClass="bg-white/[0.04] hover:bg-white/[0.08] text-slate-300 border-white/[0.08]"
         threadCount={threadCount}
         annotation={annotation}
         onOpenThread={onOpenThread}

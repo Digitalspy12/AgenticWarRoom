@@ -2,6 +2,7 @@
 // Shared Card Footer — Pinned Annotation & Thread Trigger
 // ============================================
 
+import { Pin, MessageSquare, FileEdit } from 'lucide-react';
 import type { CardAnnotation } from '../../lib/types';
 
 interface CardFooterProps {
@@ -30,10 +31,10 @@ export function CardFooter({
   return (
     <>
       {annotation && (
-        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl px-3 py-2 flex items-start gap-2 text-xs font-mono text-amber-200">
-          <span className="text-amber-400 text-sm">📌</span>
+        <div className="bg-amber-500/10 border border-amber-500/20 rounded-md px-2.5 py-1.5 flex items-start gap-2 text-xs font-mono text-amber-200">
+          <Pin className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
           <div className="flex-1 min-w-0">
-            <span className="font-bold text-amber-300 text-[11px]">Annotation by @{annotation.author}: </span>
+            <span className="font-medium text-amber-300 text-[11px]">Note by @{annotation.author}: </span>
             <span>{annotation.note}</span>
           </div>
         </div>
@@ -43,21 +44,23 @@ export function CardFooter({
         <button
           type="button"
           onClick={open}
-          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-mono font-medium transition cursor-pointer ${buttonClass}`}
+          className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-xs font-mono font-medium transition cursor-pointer ${buttonClass}`}
         >
-          <span>💬</span>
-          <span>{threadCount > 0 ? `${threadCount} Replies` : 'Reply in Thread'}</span>
+          <MessageSquare className="w-3 h-3 text-slate-400" />
+          <span>{threadCount > 0 ? `${threadCount} replies` : 'Reply in thread'}</span>
         </button>
 
         <button
           type="button"
           onClick={open}
-          className="text-[11px] font-mono text-slate-400 hover:text-amber-300 transition cursor-pointer"
+          className="flex items-center gap-1 text-[11px] font-mono text-slate-400 hover:text-slate-200 transition cursor-pointer"
         >
-          {annotation ? 'Edit Note' : '📝 Annotate'}
+          <FileEdit className="w-3 h-3" />
+          <span>{annotation ? 'Edit note' : 'Annotate'}</span>
         </button>
       </div>
     </>
   );
 }
+
 

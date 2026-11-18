@@ -3,6 +3,7 @@
 // ============================================
 
 import { useState, useEffect, useCallback } from 'react';
+import { Play, Square, X, Mic } from 'lucide-react';
 import { speechService, generateBriefingScript } from '../lib/speechService';
 import type { Incident } from '../lib/types';
 
@@ -42,27 +43,22 @@ export function AudioBriefingPill({ incident }: AudioBriefingPillProps) {
 
   return (
     <div className="relative inline-flex items-center">
-      <div className="flex items-center gap-1.5 bg-[#0b1329] border border-blue-500/40 hover:border-blue-500/70 px-2.5 py-1 rounded-xl shadow-lg shadow-blue-950/40 text-xs font-sans transition">
-        {/* Animated Waveform Equalizer */}
-        <div className="flex items-end gap-[2px] h-3.5 w-4 shrink-0">
+      <div className="flex items-center gap-2 bg-[#1c222e] border border-white/[0.08] hover:border-white/[0.14] px-2.5 py-1 rounded-md text-xs font-sans transition">
+        {/* Monochromatic Equalizer indicator */}
+        <div className="flex items-end gap-[2px] h-3 w-3 shrink-0">
           <span
-            className={`w-[2px] bg-blue-400 rounded-full transition-all duration-150 ${
-              isPlaying ? 'h-3.5 animate-pulse' : 'h-1.5 opacity-50'
+            className={`w-[2px] bg-slate-300 rounded-full transition-all duration-150 ${
+              isPlaying ? 'h-3 animate-pulse' : 'h-1.5 opacity-40'
             }`}
           />
           <span
-            className={`w-[2px] bg-emerald-400 rounded-full transition-all duration-150 delay-75 ${
-              isPlaying ? 'h-2 animate-bounce' : 'h-2 opacity-50'
+            className={`w-[2px] bg-slate-300 rounded-full transition-all duration-150 delay-75 ${
+              isPlaying ? 'h-2' : 'h-2 opacity-40'
             }`}
           />
           <span
-            className={`w-[2px] bg-indigo-400 rounded-full transition-all duration-150 delay-150 ${
-              isPlaying ? 'h-3 animate-pulse' : 'h-1 opacity-50'
-            }`}
-          />
-          <span
-            className={`w-[2px] bg-teal-400 rounded-full transition-all duration-150 ${
-              isPlaying ? 'h-2.5 animate-bounce' : 'h-2 opacity-50'
+            className={`w-[2px] bg-slate-300 rounded-full transition-all duration-150 delay-150 ${
+              isPlaying ? 'h-2.5 animate-pulse' : 'h-1 opacity-40'
             }`}
           />
         </div>
@@ -71,19 +67,19 @@ export function AudioBriefingPill({ incident }: AudioBriefingPillProps) {
         <button
           type="button"
           onClick={handleToggle}
-          className="flex items-center gap-1.5 font-bold text-[11px] text-blue-300 hover:text-white transition cursor-pointer select-none active:scale-95"
+          className="flex items-center gap-1.5 font-medium text-[11px] text-slate-200 hover:text-white transition cursor-pointer select-none"
           title="Play synthesized audio debrief"
         >
-          <span>{isPlaying ? '■' : '▶'}</span>
-          <span>{isPlaying ? 'Stop Voice' : 'Voice Debrief'}</span>
+          {isPlaying ? <Square className="w-3 h-3 text-rose-400" /> : <Play className="w-3 h-3 text-emerald-400" />}
+          <span>{isPlaying ? 'Stop briefing' : 'Voice briefing'}</span>
         </button>
 
         {/* Subtitle Toggle */}
         <button
           type="button"
           onClick={() => setShowSubtitle((v) => !v)}
-          className={`text-[9px] font-mono px-1.5 py-0.5 rounded transition cursor-pointer ${
-            showSubtitle ? 'bg-blue-500/30 text-blue-200' : 'text-slate-400 hover:text-slate-200'
+          className={`text-[10px] font-mono px-1 py-0.2 rounded transition cursor-pointer ${
+            showSubtitle ? 'bg-white/[0.1] text-slate-100' : 'text-slate-400 hover:text-slate-200'
           }`}
           title="Toggle transcript text"
         >
@@ -93,21 +89,21 @@ export function AudioBriefingPill({ incident }: AudioBriefingPillProps) {
 
       {/* Floating Transcript Bubble when toggled or playing */}
       {showSubtitle && scriptText && (
-        <div className="absolute left-0 top-full mt-2 w-80 max-w-sm bg-[#080d19]/98 border border-blue-500/40 rounded-xl p-3 shadow-2xl shadow-black/90 backdrop-blur-md z-50 text-slate-200 text-xs space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-150">
-          <div className="flex items-center justify-between text-[10px] font-mono text-blue-400 font-bold border-b border-white/[0.08] pb-1">
-            <span className="flex items-center gap-1">
-              <span>🎙️</span>
-              <span>EXECUTIVE VERBAL DEBRIEF</span>
+        <div className="absolute left-0 top-full mt-2 w-80 max-w-sm bg-[#161b24] border border-white/[0.1] rounded-lg p-3 shadow-xl z-50 text-slate-200 text-xs space-y-1.5 animate-in fade-in duration-150">
+          <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 border-b border-white/[0.08] pb-1">
+            <span className="flex items-center gap-1.5">
+              <Mic className="w-3 h-3 text-slate-400" />
+              <span>Executive voice debrief</span>
             </span>
             <button
               type="button"
               onClick={() => setShowSubtitle(false)}
-              className="text-slate-400 hover:text-white cursor-pointer px-1"
+              className="text-slate-400 hover:text-white cursor-pointer"
             >
-              ✕
+              <X className="w-3.5 h-3.5" />
             </button>
           </div>
-          <p className="text-[11px] leading-relaxed text-slate-200 font-sans">
+          <p className="text-[11px] leading-relaxed text-slate-300 font-sans">
             &ldquo;{scriptText}&rdquo;
           </p>
         </div>
