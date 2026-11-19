@@ -1,62 +1,83 @@
 @import "tailwindcss";
 
 /* ============================================
-   Agentic WarRoom — Graphite Instrument Theme
-   (Unslopped Design Tokens & Hairline Chrome)
+   Agentic WarRoom — Premium Avionics Cockpit
+   (Obsidian Slate, Tactical Depth & Jewel Accents)
    ============================================ */
 
 :root {
   color-scheme: dark;
 
-  /* Theme Surfaces (Graphite Technical Cockpit) */
-  --color-bg-dark: #0b0e14;
-  --color-bg-panel: #11151d;
-  --color-bg-card: #161b24;
-  --color-bg-card-hover: #1c222e;
-  --color-bg-card-elevated: #202734;
+  /* Theme Surfaces (High-Contrast Obsidian Architecture) */
+  --color-bg-dark: #06080d;
+  --color-bg-panel: #0b0e17;
+  --color-bg-card: #10141f;
+  --color-bg-card-hover: #151b2a;
+  --color-bg-card-elevated: #192133;
 
-  /* Text Roles (3 deliberate levels from Graphite ramp) */
-  --color-text-primary: #f0f3f6;
-  --color-text-secondary: #8b949e;
-  --color-text-muted: #57606a;
+  /* Typography Roles */
+  --color-text-primary: #f8fafc;
+  --color-text-secondary: #94a3b8;
+  --color-text-muted: #64748b;
 
-  /* Crisp Hairlines (8-10% opacity) */
+  /* Crisp Linear-Style Hairlines */
   --color-border: rgba(255, 255, 255, 0.08);
-  --color-border-hover: rgba(255, 255, 255, 0.14);
-  --color-border-subtle: rgba(255, 255, 255, 0.04);
+  --color-border-hover: rgba(255, 255, 255, 0.16);
+  --color-border-subtle: rgba(255, 255, 255, 0.05);
 
-  /* Semantic Status Tokens (Sober, toned down) */
-  --color-critical: #f85149;
-  --color-critical-bg: rgba(248, 81, 73, 0.1);
-  --color-critical-border: rgba(248, 81, 73, 0.28);
-
-  --color-warning: #d29922;
-  --color-warning-bg: rgba(210, 153, 34, 0.1);
-  --color-warning-border: rgba(210, 153, 34, 0.28);
-
-  --color-resolved: #3fb950;
-  --color-resolved-bg: rgba(63, 185, 80, 0.1);
-  --color-resolved-border: rgba(63, 185, 80, 0.28);
-
-  --color-diagnosing: #58a6ff;
-  --color-diagnosing-bg: rgba(88, 166, 255, 0.1);
-  --color-diagnosing-border: rgba(88, 166, 255, 0.28);
-
-  --color-accent: #388bfd;
+  /* Avionics Jewel Accents */
+  --color-ruby: #ef4444;
+  --color-amber: #f59e0b;
+  --color-emerald: #10b981;
+  --color-cyan: #38bdf8;
+  --color-violet: #a855f7;
+  --color-accent: #3b82f6;
 }
 
 body {
   margin: 0;
   background-color: var(--color-bg-dark);
   color: var(--color-text-primary);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  letter-spacing: -0.011em;
   overflow: hidden;
-  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+  scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
 }
 
-/* Monospace fonts for code & metrics */
+/* Monospace fonts for telemetry, code & timestamps */
 code, pre, .font-mono {
   font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  letter-spacing: -0.02em;
+}
+
+/* Linear-style tactile edge lighting (Bevels) */
+.bevel-card {
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.08), 0 4px 12px -2px rgba(0, 0, 0, 0.5);
+}
+
+.bevel-subtle {
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.06);
+}
+
+.keycap {
+  background: #141926;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-bottom: 2px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+/* Radar pulse animation for standby flight deck */
+@keyframes radarSweep {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.radar-sweep {
+  animation: radarSweep 6s linear infinite;
 }
 
 /* Clean hairline scrollbar */
@@ -128,4 +149,5 @@ code, pre, .font-mono {
     opacity: 1;
   }
 }
+
 

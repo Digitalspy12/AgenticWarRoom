@@ -13,6 +13,9 @@ import {
   CornerDownRight,
   MessageSquare,
   ShieldCheck,
+  Zap,
+  Database,
+  RefreshCw,
 } from 'lucide-react';
 import {
   executeRemediation,
@@ -21,6 +24,7 @@ import {
   getIncident,
   getCardThreads,
   getCardAnnotations,
+  triggerIncident,
 } from '../lib/api';
 import { CURRENT_USER_ID } from '../lib/constants';
 import { speechService } from '../lib/speechService';
@@ -34,6 +38,7 @@ import type { Incident, AgentResponse, CustomMessageType, CardAnnotation } from 
 interface ChatPaneProps {
   incident: Incident | null;
   onIncidentUpdated: (incident: Incident) => void;
+  onTriggerScenario?: (scenarioId: string) => void;
 }
 
 interface ChatMessage {
@@ -50,7 +55,7 @@ interface TypingAgentInfo {
   timestamp: number;
 }
 
-export function ChatPane({ incident, onIncidentUpdated }: ChatPaneProps) {
+export function ChatPane({ incident, onIncidentUpdated, onTriggerScenario }: ChatPaneProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [executing, setExecuting] = useState(false);
   const [inputText, setInputText] = useState('');
@@ -566,7 +571,7 @@ export function ChatPane({ incident, onIncidentUpdated }: ChatPaneProps) {
   const renderCard = (msg: ChatMessage) => {
     if (!msg.agentResponse) {
       return (
-        <div className="bg-[#161b24] border border-white/[0.08] rounded-lg px-3.5 py-2 text-xs text-slate-200 leading-relaxed max-w-2xl font-sans">
+        <div className="bg-[#10141f] bevel-card rounded-lg px-3.5 py-2.5 text-xs text-slate-200 leading-relaxed max-w-2xl font-sans">
           {msg.text}
         </div>
       );
@@ -616,7 +621,7 @@ export function ChatPane({ incident, onIncidentUpdated }: ChatPaneProps) {
       case 'AGENT_CHAT': {
         const count = threadCounts[msg.id] || 0;
         return (
-          <div className="bg-[#161b24] border border-white/[0.08] rounded-lg p-3 text-xs space-y-2 max-w-2xl font-sans">
+          <div className="bg-[#10141f] bevel-card rounded-lg p-3.5 text-xs space-y-2 max-w-2xl font-sans">
             <div className="text-slate-200 leading-relaxed whitespace-pre-wrap">
               {msg.agentResponse.text}
             </div>
@@ -644,43 +649,239 @@ export function ChatPane({ incident, onIncidentUpdated }: ChatPaneProps) {
 
       default:
         return (
-          <div className="bg-[#161b24] border border-white/[0.08] rounded-lg p-3 text-xs text-slate-200">
+          <div className="bg-[#10141f] bevel-card rounded-lg p-3 text-xs text-slate-200">
             {msg.agentResponse.text}
           </div>
         );
     }
   };
 
-  // Empty State (No incident active)
+  // Standby Cockpit Flight Deck (No active incident)
   if (!incident) {
     return (
-      <div className="flex-1 min-h-0 flex items-center justify-center p-8 bg-[#090d13]">
-        <div className="text-center max-w-sm">
-          <div className="w-10 h-10 mx-auto mb-3 rounded-lg bg-[#161b24] border border-white/[0.08] flex items-center justify-center text-slate-400">
-            <ShieldCheck className="w-5 h-5 text-emerald-400" />
-          </div>
-          <h2 className="text-sm font-semibold text-white tracking-tight mb-1">
-            Mission control ready
-          </h2>
-          <p className="text-xs text-slate-400 mb-5 leading-relaxed">
-            All services are healthy. Trigger an outage scenario from the left panel to begin automated agent triage.
-          </p>
+      <div className="flex-1 min-h-0 overflow-y-auto p-6 md:p-8 bg-[#06080d] flex flex-col items-center justify-center">
+        <div className="w-full max-w-3xl space-y-5">
+          {/* HUD Header Status Banner */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl bg-[#0b0e17] bevel-card gap-3">
+            <div className="flex items-center gap-3">
+              <div className="relative flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 shrink-0">
+                <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-emerald-400 animate-ping opacity-75" />
+                <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-emerald-400" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-white tracking-wide uppercase">
+                    Avionics Mission Control
+                  </span>
+                  <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-medium">
+                    STANDBY READY
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  Autonomous Multi-Agent Triage Swarm powered by Nexconn Chat SDK
+                </p>
+              </div>
+            </div>
 
-          <div className="grid grid-cols-3 gap-2 text-left">
-            <div className="p-2.5 rounded-lg bg-[#11151d] border border-white/[0.06]">
-              <Terminal className="w-3.5 h-3.5 text-sky-400" />
-              <div className="text-[11px] font-medium text-slate-200 mt-1">@LogBot</div>
-              <div className="text-[10px] text-slate-400">Stack parser</div>
+            <div className="flex items-center gap-4 font-mono text-[11px] text-slate-400 border-t sm:border-t-0 sm:border-l border-white/[0.08] pt-2 sm:pt-0 sm:pl-4">
+              <div>
+                <span className="text-slate-500 text-[9px] uppercase tracking-wider block">Gateway</span>
+                <span className="text-slate-200 font-medium">18ms</span>
+              </div>
+              <div>
+                <span className="text-slate-500 text-[9px] uppercase tracking-wider block">Nodes</span>
+                <span className="text-emerald-400 font-medium">12/12</span>
+              </div>
+              <div>
+                <span className="text-slate-500 text-[9px] uppercase tracking-wider block">LLM Engine</span>
+                <span className="text-cyan-400 font-medium">Groq 70B</span>
+              </div>
             </div>
-            <div className="p-2.5 rounded-lg bg-[#11151d] border border-white/[0.06]">
-              <Cpu className="w-3.5 h-3.5 text-purple-400" />
-              <div className="text-[11px] font-medium text-slate-200 mt-1">@DBAgent</div>
-              <div className="text-[10px] text-slate-400">Root cause RCA</div>
+          </div>
+
+          {/* Sentry Agent Fleet Telemetry Dossiers */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {/* LogBot */}
+            <div className="p-4 rounded-xl bg-[#0b0e17] bevel-card hover:border-cyan-500/30 transition flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/25 flex items-center justify-center text-cyan-400">
+                    <Terminal className="w-4 h-4" />
+                  </div>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/25 font-semibold">
+                    STAGE 1
+                  </span>
+                </div>
+                <div className="text-sm font-semibold text-white tracking-tight">@LogBot</div>
+                <div className="text-[11px] text-cyan-300/80 font-mono mt-0.5">Telemetry & Anomaly Parsing</div>
+                <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+                  Ingests live K8s syslog streams, isolates error stack traces, and detects anomaly spikes within 250ms.
+                </p>
+              </div>
+              <div className="pt-3 mt-3 border-t border-white/[0.06] flex items-center justify-between text-[10px] font-mono text-slate-400">
+                <span>Model: Llama-3-70B</span>
+                <span className="text-emerald-400 flex items-center gap-1 font-medium">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  Active
+                </span>
+              </div>
             </div>
-            <div className="p-2.5 rounded-lg bg-[#11151d] border border-white/[0.06]">
-              <PlayCircle className="w-3.5 h-3.5 text-orange-400" />
-              <div className="text-[11px] font-medium text-slate-200 mt-1">@DeployBot</div>
-              <div className="text-[10px] text-slate-400">HITL playbook</div>
+
+            {/* DBAgent */}
+            <div className="p-4 rounded-xl bg-[#0b0e17] bevel-card hover:border-purple-500/30 transition flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="w-8 h-8 rounded-lg bg-purple-500/10 border border-purple-500/25 flex items-center justify-center text-purple-400">
+                    <Cpu className="w-4 h-4" />
+                  </div>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-300 border border-purple-500/25 font-semibold">
+                    STAGE 2
+                  </span>
+                </div>
+                <div className="text-sm font-semibold text-white tracking-tight">@DBAgent</div>
+                <div className="text-[11px] text-purple-300/80 font-mono mt-0.5">Deep RCA Forensic Engine</div>
+                <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+                  Performs blast-radius mapping, isolates query lock contention, and establishes causality chains.
+                </p>
+              </div>
+              <div className="pt-3 mt-3 border-t border-white/[0.06] flex items-center justify-between text-[10px] font-mono text-slate-400">
+                <span>RCA: Causality Graph</span>
+                <span className="text-emerald-400 flex items-center gap-1 font-medium">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  Armed
+                </span>
+              </div>
+            </div>
+
+            {/* DeployBot */}
+            <div className="p-4 rounded-xl bg-[#0b0e17] bevel-card hover:border-amber-500/30 transition flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/25 flex items-center justify-center text-amber-400">
+                    <PlayCircle className="w-4 h-4" />
+                  </div>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/25 font-semibold">
+                    STAGE 3
+                  </span>
+                </div>
+                <div className="text-sm font-semibold text-white tracking-tight">@DeployBot</div>
+                <div className="text-[11px] text-amber-300/80 font-mono mt-0.5">HITL Remediation Controller</div>
+                <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+                  Synthesizes rollback & pool drain playbooks, requiring cryptographic approval from Incident Commander.
+                </p>
+              </div>
+              <div className="pt-3 mt-3 border-t border-white/[0.06] flex items-center justify-between text-[10px] font-mono text-slate-400">
+                <span>Security: RBAC Gated</span>
+                <span className="text-amber-400 flex items-center gap-1 font-medium">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                  Standby
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Outage Scenario Launchpad */}
+          <div className="p-4 rounded-xl bg-[#0b0e17] bevel-card space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Zap className="w-3.5 h-3.5 text-amber-400" />
+                <h3 className="text-xs font-semibold text-white tracking-wide uppercase">
+                  Synthetic Outage Simulator
+                </h3>
+              </div>
+              <span className="text-[10px] text-slate-400 font-mono">
+                Click any scenario to trigger agent swarm
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              <button
+                type="button"
+                onClick={() => onTriggerScenario ? onTriggerScenario('db_deadlock') : triggerIncident({ scenarioId: 'db_deadlock' })}
+                className="text-left p-3 rounded-lg bg-[#10141f] border border-white/[0.08] hover:border-blue-500/40 hover:bg-[#151b2a] transition cursor-pointer group"
+              >
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs font-semibold text-slate-200 group-hover:text-blue-300 transition flex items-center gap-1.5">
+                    <Database className="w-3.5 h-3.5 text-blue-400" />
+                    DB Deadlock
+                  </span>
+                  <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-rose-500/15 text-rose-300 border border-rose-500/30 font-semibold">
+                    SEV-1
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400 leading-snug">
+                  Postgres pool saturation and 40s lock queue timeout
+                </p>
+                <div className="mt-2.5 text-[10px] font-mono text-blue-400/80 group-hover:text-blue-300 flex items-center gap-1">
+                  <span>Simulate incident</span>
+                  <span>&rarr;</span>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onTriggerScenario ? onTriggerScenario('pod_crashloop') : triggerIncident({ scenarioId: 'pod_crashloop' })}
+                className="text-left p-3 rounded-lg bg-[#10141f] border border-white/[0.08] hover:border-amber-500/40 hover:bg-[#151b2a] transition cursor-pointer group"
+              >
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs font-semibold text-slate-200 group-hover:text-amber-300 transition flex items-center gap-1.5">
+                    <RefreshCw className="w-3.5 h-3.5 text-amber-400" />
+                    Pod CrashLoop
+                  </span>
+                  <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-rose-500/15 text-rose-300 border border-rose-500/30 font-semibold">
+                    SEV-1
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400 leading-snug">
+                  OOMKilled memory leak in billing worker replica
+                </p>
+                <div className="mt-2.5 text-[10px] font-mono text-amber-400/80 group-hover:text-amber-300 flex items-center gap-1">
+                  <span>Simulate incident</span>
+                  <span>&rarr;</span>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onTriggerScenario ? onTriggerScenario('redis_502') : triggerIncident({ scenarioId: 'redis_502' })}
+                className="text-left p-3 rounded-lg bg-[#10141f] border border-white/[0.08] hover:border-rose-500/40 hover:bg-[#151b2a] transition cursor-pointer group"
+              >
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs font-semibold text-slate-200 group-hover:text-rose-300 transition flex items-center gap-1.5">
+                    <Zap className="w-3.5 h-3.5 text-rose-400" />
+                    502 Gateway Spike
+                  </span>
+                  <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 font-semibold">
+                    SEV-2
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400 leading-snug">
+                  Redis cache eviction storm & gateway dropped sockets
+                </p>
+                <div className="mt-2.5 text-[10px] font-mono text-rose-400/80 group-hover:text-rose-300 flex items-center gap-1">
+                  <span>Simulate incident</span>
+                  <span>&rarr;</span>
+                </div>
+              </button>
+            </div>
+          </div>
+
+          {/* Pipeline Topology Flow */}
+          <div className="p-3 rounded-xl bg-[#0b0e17] bevel-card flex flex-col sm:flex-row items-center justify-between text-xs gap-2.5">
+            <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 shrink-0">
+              Triage Swarm Pipeline:
+            </span>
+            <div className="flex flex-wrap items-center justify-center gap-1.5 text-[10px] font-mono">
+              <span className="px-2 py-0.5 rounded bg-[#10141f] border border-white/[0.08] text-slate-300">Anomaly Ingestion</span>
+              <span className="text-slate-600">&rarr;</span>
+              <span className="px-2 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/25 text-cyan-300">@LogBot</span>
+              <span className="text-slate-600">&rarr;</span>
+              <span className="px-2 py-0.5 rounded bg-purple-500/10 border border-purple-500/25 text-purple-300">@DBAgent</span>
+              <span className="text-slate-600">&rarr;</span>
+              <span className="px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/25 text-amber-300">@DeployBot</span>
+              <span className="text-slate-600">&rarr;</span>
+              <span className="px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/25 text-emerald-300">SRE Approval</span>
             </div>
           </div>
         </div>
@@ -691,17 +892,17 @@ export function ChatPane({ incident, onIncidentUpdated }: ChatPaneProps) {
   const activeTypingList = Object.entries(typingAgents);
 
   return (
-    <div className="flex flex-col h-full min-h-0 bg-[#090d13] relative">
+    <div className="flex flex-col h-full min-h-0 bg-[#06080d] relative">
       {/* Subheader: Active War Room Channel bar */}
-      <div className="h-9 border-b border-white/[0.08] bg-[#11151d] px-4 flex items-center justify-between text-xs shrink-0 z-10">
+      <div className="h-9 border-b border-white/[0.08] bg-[#0b0e17] px-4 flex items-center justify-between text-xs shrink-0 z-10">
         <div className="flex items-center gap-2">
-          <span className="text-slate-400 font-mono">#</span>
-          <span className="font-mono text-slate-200">{incident.id}</span>
-          <span className="text-slate-400">•</span>
+          <span className="text-slate-500 font-mono">#</span>
+          <span className="font-mono text-slate-200 font-semibold">{incident.id}</span>
+          <span className="text-slate-600">•</span>
           <span className="text-slate-400 truncate max-w-xs">{incident.title}</span>
         </div>
         <div className="flex items-center gap-2 text-[11px] text-slate-400 font-mono">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
           <span>WebSocket connected</span>
         </div>
       </div>
@@ -733,7 +934,7 @@ export function ChatPane({ incident, onIncidentUpdated }: ChatPaneProps) {
           return (
             <div key={msg.id} className="flex items-start gap-2.5 group">
               {/* Avatar Icon */}
-              <div className="w-7 h-7 rounded-md bg-[#161b24] border border-white/[0.08] flex items-center justify-center shrink-0 mt-0.5 text-slate-300">
+              <div className="w-7 h-7 rounded-md bg-[#10141f] border border-white/[0.08] flex items-center justify-center shrink-0 mt-0.5 text-slate-300">
                 <Icon className="w-3.5 h-3.5" />
               </div>
 
@@ -778,7 +979,7 @@ export function ChatPane({ incident, onIncidentUpdated }: ChatPaneProps) {
               key={agentName}
               className="flex items-start gap-2.5 animate-fade-in"
             >
-              <div className="w-7 h-7 rounded-md bg-[#161b24] border border-white/[0.08] flex items-center justify-center shrink-0 mt-0.5 text-slate-300">
+              <div className="w-7 h-7 rounded-md bg-[#10141f] border border-white/[0.08] flex items-center justify-center shrink-0 mt-0.5 text-slate-300">
                 <Icon className="w-3.5 h-3.5" />
               </div>
 
@@ -790,7 +991,7 @@ export function ChatPane({ incident, onIncidentUpdated }: ChatPaneProps) {
                   </span>
                 </div>
 
-                <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg bg-[#161b24] border border-white/[0.08] text-xs text-slate-300">
+                <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg bg-[#10141f] bevel-card border border-white/[0.08] text-xs text-slate-300">
                   <div className="flex items-center gap-1">
                     <span className="typing-dot bg-slate-400" />
                     <span className="typing-dot bg-slate-400" />
@@ -811,7 +1012,7 @@ export function ChatPane({ incident, onIncidentUpdated }: ChatPaneProps) {
         <button
           type="button"
           onClick={() => scrollToBottom(true)}
-          className="absolute bottom-24 right-6 z-30 flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#1c222e] hover:bg-[#222938] text-slate-200 text-xs font-medium border border-white/[0.1] shadow-lg transition-colors cursor-pointer"
+          className="absolute bottom-24 right-6 z-30 flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#10141f] hover:bg-[#151b2a] text-slate-200 text-xs font-medium border border-white/[0.1] shadow-lg transition-colors cursor-pointer"
         >
           <ArrowDown className="w-3 h-3" />
           <span>Jump to latest</span>
@@ -819,7 +1020,7 @@ export function ChatPane({ incident, onIncidentUpdated }: ChatPaneProps) {
       )}
 
       {/* Modern Interactive Command Bar with Quick Prompts */}
-      <div className="border-t border-white/[0.08] p-3 bg-[#11151d] shrink-0 z-10">
+      <div className="border-t border-white/[0.08] p-3 bg-[#0b0e17] shrink-0 z-10">
         {/* Quick Action Chips & Mentions (Day 3 Feature) */}
         <div className="flex items-center gap-1.5 mb-2 px-1 overflow-x-auto pb-1 scrollbar-none">
           <span className="text-[10px] text-slate-400 font-mono shrink-0 mr-1">
@@ -829,27 +1030,27 @@ export function ChatPane({ incident, onIncidentUpdated }: ChatPaneProps) {
           <button
             type="button"
             onClick={() => handleSendMessage('@DeployBot change risk to LOW')}
-            className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#161b24] hover:bg-[#1c222e] text-slate-300 border border-white/[0.08] transition cursor-pointer shrink-0 flex items-center gap-1"
+            className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#10141f] hover:bg-[#151b2a] text-slate-300 border border-white/[0.08] hover:border-amber-500/30 transition cursor-pointer shrink-0 flex items-center gap-1"
           >
-            <CornerDownRight className="w-3 h-3 text-slate-400" />
+            <CornerDownRight className="w-3 h-3 text-amber-400" />
             <span>@DeployBot change risk to LOW</span>
           </button>
 
           <button
             type="button"
             onClick={() => handleSendMessage('@LogBot show last 20 lines')}
-            className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#161b24] hover:bg-[#1c222e] text-slate-300 border border-white/[0.08] transition cursor-pointer shrink-0 flex items-center gap-1"
+            className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#10141f] hover:bg-[#151b2a] text-slate-300 border border-white/[0.08] hover:border-cyan-500/30 transition cursor-pointer shrink-0 flex items-center gap-1"
           >
-            <CornerDownRight className="w-3 h-3 text-slate-400" />
+            <CornerDownRight className="w-3 h-3 text-cyan-400" />
             <span>@LogBot show last 20 lines</span>
           </button>
 
           <button
             type="button"
             onClick={() => handleSendMessage('@DBAgent explain deadlock')}
-            className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#161b24] hover:bg-[#1c222e] text-slate-300 border border-white/[0.08] transition cursor-pointer shrink-0 flex items-center gap-1"
+            className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#10141f] hover:bg-[#151b2a] text-slate-300 border border-white/[0.08] hover:border-purple-500/30 transition cursor-pointer shrink-0 flex items-center gap-1"
           >
-            <CornerDownRight className="w-3 h-3 text-slate-400" />
+            <CornerDownRight className="w-3 h-3 text-purple-400" />
             <span>@DBAgent explain deadlock</span>
           </button>
 
@@ -858,21 +1059,21 @@ export function ChatPane({ incident, onIncidentUpdated }: ChatPaneProps) {
           <button
             type="button"
             onClick={() => setInputText((prev) => `${prev}@LogBot `)}
-            className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#161b24] text-slate-400 border border-white/[0.08] hover:text-slate-200 transition cursor-pointer shrink-0"
+            className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#10141f] text-cyan-300/80 border border-white/[0.08] hover:border-cyan-500/30 hover:text-cyan-200 transition cursor-pointer shrink-0"
           >
             @LogBot
           </button>
           <button
             type="button"
             onClick={() => setInputText((prev) => `${prev}@DBAgent `)}
-            className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#161b24] text-slate-400 border border-white/[0.08] hover:text-slate-200 transition cursor-pointer shrink-0"
+            className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#10141f] text-purple-300/80 border border-white/[0.08] hover:border-purple-500/30 hover:text-purple-200 transition cursor-pointer shrink-0"
           >
             @DBAgent
           </button>
           <button
             type="button"
             onClick={() => setInputText((prev) => `${prev}@DeployBot `)}
-            className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#161b24] text-slate-400 border border-white/[0.08] hover:text-slate-200 transition cursor-pointer shrink-0"
+            className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#10141f] text-amber-300/80 border border-white/[0.08] hover:border-amber-500/30 hover:text-amber-200 transition cursor-pointer shrink-0"
           >
             @DeployBot
           </button>
@@ -891,7 +1092,7 @@ export function ChatPane({ incident, onIncidentUpdated }: ChatPaneProps) {
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               placeholder="Prompt agents (@DeployBot change risk to LOW, @LogBot show last 20 lines, @DBAgent why)..."
-              className="w-full bg-[#161b24] text-xs text-slate-100 placeholder:text-slate-400 px-3 py-2 rounded-md border border-white/[0.08] focus:outline-none focus:border-white/[0.2] transition font-sans"
+              className="w-full bg-[#10141f] text-xs text-slate-100 placeholder:text-slate-500 px-3 py-2 rounded-md border border-white/[0.08] focus:outline-none focus:border-cyan-500/40 transition font-sans"
             />
           </div>
 
@@ -900,7 +1101,7 @@ export function ChatPane({ incident, onIncidentUpdated }: ChatPaneProps) {
             disabled={!inputText.trim() || sending}
             className={`px-3 py-2 rounded-md text-xs font-medium transition flex items-center gap-1.5 shrink-0 border ${
               inputText.trim() && !sending
-                ? 'bg-[#1c222e] hover:bg-[#222938] text-slate-200 border-white/[0.1] cursor-pointer'
+                ? 'bg-[#151b2a] hover:bg-[#1a2236] text-cyan-300 border-cyan-500/30 shadow-sm cursor-pointer'
                 : 'bg-transparent text-slate-500 border-white/[0.05] cursor-not-allowed'
             }`}
           >

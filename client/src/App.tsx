@@ -107,7 +107,7 @@ function App() {
   }, [activeIncident]);
 
   return (
-    <div className="h-screen flex flex-col bg-[var(--color-bg-dark)] text-[var(--color-text-primary)] overflow-hidden">
+    <div className="h-screen flex flex-col bg-[#06080d] text-[var(--color-text-primary)] overflow-hidden font-sans">
       {/* ---- Top Banner ---- */}
       <IncidentBanner
         incident={activeIncident}
@@ -119,7 +119,7 @@ function App() {
       {/* ---- 3-Pane Cockpit ---- */}
       <div className="flex flex-1 overflow-hidden">
         {/* Left Pane: Chaos Simulator + Incident List */}
-        <div className="w-72 border-r border-white/[0.08] flex flex-col bg-[#0d1117] shrink-0">
+        <div className="w-76 border-r border-white/[0.08] flex flex-col bg-[#0b0e17] shrink-0">
           <ChaosDrawer
             onIncidentCreated={handleIncidentCreated}
             incidents={incidents}
@@ -131,17 +131,22 @@ function App() {
           />
         </div>
 
-        {/* Center Pane: War Room Chat */}
-        <div className="flex-1 flex flex-col bg-[#090d13] min-w-0 min-h-0">
+        {/* Center Pane: War Room Chat & Mission Control Flight Deck */}
+        <div className="flex-1 flex flex-col bg-[#080b12] min-w-0 min-h-0">
           <ChatPane
             key={activeIncident?.id ?? 'empty'}
             incident={activeIncident}
             onIncidentUpdated={handleIncidentUpdated}
+            onTriggerScenario={(scenarioId) => {
+              // Quick launch from flight deck
+              const inc = incidents.find((i) => i.scenarioId === scenarioId);
+              if (inc) setActiveIncident(inc);
+            }}
           />
         </div>
 
         {/* Right Pane: Telemetry & AI Reasoning */}
-        <div className="w-80 border-l border-white/[0.08] bg-[#0d1117] shrink-0 hidden lg:block">
+        <div className="w-80 border-l border-white/[0.08] bg-[#0b0e17] shrink-0 hidden lg:block">
           <TelemetryPane incident={activeIncident} />
         </div>
       </div>
